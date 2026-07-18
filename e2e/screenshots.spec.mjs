@@ -44,10 +44,7 @@ async function login(page) {
     await usernameField.fill(username);
     await passwordField.fill(password);
 
-    await Promise.all([
-      page.waitForNavigation({ waitUntil: 'load', timeout: 30_000 }),
-      loginButton.click(),
-    ]);
+    await loginButton.click();
   }
 
   // Wait for either the widget or an access-denied message.

@@ -20,7 +20,6 @@
     "@playwright/test": "^1.61.1",
     "@servicenow/glide": "27.0.5",
     "@servicenow/sdk": "4.8.1",
-    "dotenv": "^17.4.2",
-    "playwright": "^1.61.1"
+    "dotenv": "^17.4.2"
   }
 }
