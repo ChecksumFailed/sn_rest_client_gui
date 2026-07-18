@@ -24,10 +24,12 @@ const ENGINE_SOURCE = readFileSync(ENGINE_PATH, 'utf8')
 /** A RESTMessageV2 stand-in that records every call for assertions. */
 function makeSpyMessage(response) {
     const calls = []
+    let endpoint = ''
     const rec = (name) => (...args) => { calls.push({ name, args }) }
     const msg = {
         calls,
-        setEndpoint: rec('setEndpoint'),
+        setEndpoint: (ep) => { endpoint = ep; calls.push({ name: 'setEndpoint', args: [ep] }) },
+        getEndpoint: () => endpoint,
         setHttpMethod: rec('setHttpMethod'),
         setRequestHeader: rec('setRequestHeader'),
         setQueryParameter: rec('setQueryParameter'),
@@ -185,6 +187,19 @@ test('url mode defaults the HTTP method to get', () => {
     assert.equal(msg.first('setHttpMethod').args[0], 'get')
 })
 
+test('url mode returns the fully constructed URL with substitutions and query params', () => {
+    const { engine } = loadEngine()
+    const r = engine.execute({
+        source: 'url',
+        endpoint: 'https://catfact.ninja/breeds?limit=${limit}',
+        httpMethod: 'get',
+        variables: { limit: '10' },
+        queryParams: { extra: 'more cats' },
+    })
+    assert.equal(r.ok, true)
+    assert.equal(r.url, 'https://catfact.ninja/breeds?limit=10&extra=more%20cats')
+})
+
 // --- REST Message mode / cross-scope resolve -------------------------------
 
 test('rest-message mode resolves the function endpoint via GlideRecord (cross-scope safe)', () => {
@@ -264,6 +279,22 @@ test('function default body is used only when the user leaves the body blank', (
     assert.equal(h.msg.first('setRequestBody').args[0], '{"mine":1}')
 })
 
+test('rest-message mode returns the fully constructed URL with substitutions and function params', () => {
+    const tables = catFactsTables({
+        params: [
+            { sys_id: 'p1', rest_message_function: 'fn1', name: 'limit', value: '5', order: '100' },
+            { sys_id: 'p2', rest_message_function: 'fn1', name: 's', value: '${symbol}', order: '200' },
+        ],
+    })
+    const { engine } = loadEngine({ tables })
+    const r = engine.execute({
+        source: 'restMessage', restMessage: 'Cat Facts', method: 'Get Random Fact',
+        variables: { max_length: '140', symbol: 'AAPL' },
+    })
+    assert.equal(r.ok, true)
+    assert.equal(r.url, 'https://catfact.ninja/fact?max_length=140&limit=5&s=AAPL')
+})
+
 // --- Authentication --------------------------------------------------------
 
 test('basic auth (profile) sets the basic authentication profile', () => {
@@ -315,6 +346,16 @@ test('api key (query) substitutes instead when the endpoint has a matching ${tok
     engine.execute({ source: 'url', endpoint: 'https://x?key=${api_key}', authType: 'apikey', apiKey: { placement: 'query', name: 'api_key', value: 'k' } })
     assert.deepEqual(msg.first('setStringParameterNoEscape').args, ['api_key', 'k'])
     assert.equal(msg.all('setQueryParameter').length, 0)
+})
+
+test('api key with an empty value is rejected, not sent as an empty credential', () => {
+    // '' must not pass the guard: the widget's post-OAuth state restore blanks
+    // stored secrets, and an empty header would fire a silent 401 instead of
+    // this validation error.
+    const { engine, msg } = loadEngine()
+    const r = engine.execute({ source: 'url', endpoint: 'https://x', authType: 'apikey', apiKey: { placement: 'header', name: 'X-API-Key', value: '' } })
+    assert.match(r.error, /key name\/value is missing/)
+    assert.equal(msg.all('setRequestHeader').length, 0)
 })
 
 test('unknown auth type is rejected', () => {
@@ -427,6 +468,18 @@ test('oauth reuses a token minted from the REST message record ("Get OAuth Token
     assert.equal(auth.calls.requestTokenByRequest, 0, 'a fresh stored token must not trigger a mint')
 })
 
+test('oauth (direct URL) reuses a token minted against the entity profile ("Get OAuth Token")', () => {
+    // Direct URL mode has no REST message record, so the interactive mint stores the
+    // token against the entity profile itself (oauth_requestor = profile). The console
+    // must search that requestor, or OAuth can never work for a direct URL.
+    const auth = oauthMock({ tokensByRequestor: { oap1: { accessToken: 'FROM-PROFILE' } }, refreshedAccessToken: '' })
+    const { engine, msg } = loadEngine({ sn_auth: auth })
+    const r = engine.execute({ source: 'url', endpoint: 'https://x', authType: 'oauth', authProfile: 'oap1' })
+    assert.equal(r.ok, true)
+    assert.deepEqual(msg.first('setRequestHeader').args, ['Authorization', 'Bearer FROM-PROFILE'])
+    assert.equal(auth.calls.requestTokenByRequest, 0, 'a fresh stored token must not trigger a mint')
+})
+
 test('oauth finds a token via the profile requestor registrations (credential page)', () => {
     const auth = oauthMock({ tokensByRequestor: { cred9: { accessToken: 'FROM-CRED' } }, refreshedAccessToken: '' })
     const tables = {
@@ -508,12 +561,19 @@ test('MID timeout defaults to 60 and accepts a user-supplied number of seconds',
 
 // --- Variables + normalization --------------------------------------------
 
-test('url mode: variables with no matching ${token} become query parameters', () => {
+test('url mode: queryParams are appended as query parameters', () => {
     const { engine, msg } = loadEngine()
-    engine.execute({ source: 'url', endpoint: 'https://x', variables: { max_length: '140', limit: '5' } })
+    engine.execute({ source: 'url', endpoint: 'https://x', queryParams: { max_length: '140', limit: '5' } })
     const q = Object.fromEntries(msg.all('setQueryParameter').map((c) => c.args))
     assert.deepEqual(q, { max_length: '140', limit: '5' })
-    assert.equal(msg.all('setStringParameterNoEscape').length, 0, 'not substituted when no token present')
+    assert.equal(msg.all('setStringParameterNoEscape').length, 0, 'no substitution when no variables')
+})
+
+test('url mode: variables are substitution-only and do not auto-append', () => {
+    const { engine, msg } = loadEngine()
+    engine.execute({ source: 'url', endpoint: 'https://x', variables: { limit: '5' } })
+    assert.equal(msg.all('setQueryParameter').length, 0, 'variables are not appended as query params')
+    assert.deepEqual(msg.first('setStringParameterNoEscape').args, ['limit', '5'])
 })
 
 test('url mode: a variable matching a ${token} substitutes and is not also duplicated on the query string', () => {
@@ -535,6 +595,17 @@ test('rest-message mode: variables substitute and are never appended as query pa
     engine.execute({ source: 'restMessage', restMessage: 'Cat Facts', method: 'Get Random Fact', variables: { max_length: '140' } })
     assert.deepEqual(msg.first('setStringParameterNoEscape').args, ['max_length', '140'])
     assert.equal(msg.all('setQueryParameter').length, 0)
+})
+
+test('rest-message mode: queryParams are appended to the URL', () => {
+    const { engine } = loadEngine({ tables: catFactsTables() })
+    const r = engine.execute({
+        source: 'restMessage', restMessage: 'Cat Facts', method: 'Get Random Fact',
+        variables: { max_length: '140' },
+        queryParams: { format: 'json' },
+    })
+    assert.equal(r.ok, true)
+    assert.equal(r.url, 'https://catfact.ninja/fact?max_length=140&format=json')
 })
 
 test('a response with haveError() is normalized to ok:false with an error code', () => {

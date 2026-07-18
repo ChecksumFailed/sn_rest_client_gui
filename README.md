@@ -64,12 +64,19 @@ so the tests run.
 3. Optionally pick a **MID Server** — required to reach firewalled endpoints. Selecting one makes the
    call asynchronous and reveals a **Timeout (seconds)** field (default 60) for how long to wait for
    the MID response. Leave it on *None (direct call)* for public endpoints.
-4. Fill in variables, headers, and a body as needed, then **Send**. The response panel shows status,
-   headers, and a pretty-printed body. Variables prefill from the function's stored variable
-   substitutions (`sys_rest_message_fn_parameters`), and query parameters defined on the function's
-   *HTTP Query Parameters* related list (`sys_rest_message_fn_param_defs`) are applied automatically —
-   both endpoint-templating (`?limit=${limit}`) and defined-parameter styles work, including defined
-   parameters whose value is itself a `${token}` resolved from your variables.
+4. Fill in request data, then **Send**:
+   - **REST Message mode:** **Variables** substitute `${name}` tokens in the endpoint and body. They
+     prefill from the function's stored variable substitutions (`sys_rest_message_fn_parameters`). Add
+     explicit **Query Params** to append `&key=value` pairs to the URL. The function's own *HTTP Query
+     Parameters* related list (`sys_rest_message_fn_param_defs`) is also applied automatically.
+   - **Direct URL mode:** type the full URL. Any query string you paste (e.g. `?limit=10`) is extracted
+     into the **Query Params** section and removed from the URL field; add more params there. The
+     **Variables** section is hidden because direct URLs do not use `${token}` substitution.
+   - Add **Headers** and a **Request Body** as needed.
+   - The response panel shows status, the actual **Request URL** sent (with substitutions and appended
+     query params), response headers, and a pretty-printed body.
+5. In the response panel, the **Request URL**, **Response Headers**, and **Response Body** sections each
+   collapse (click the heading) and carry a **Copy** button that puts that section's text on the clipboard.
 
 ## Verification still required on a live instance
 

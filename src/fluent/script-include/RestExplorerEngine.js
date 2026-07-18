@@ -33,11 +33,12 @@ RestExplorerEngine.prototype = {
      *   config.midServer   {String}  MID server NAME, or falsy for a direct call
      *   config.apiKey      {Object}  { placement:'header'|'query', name, value } (apikey only)
      *   config.variables   {Object}  REST message variable name -> value (NoEscape substitution)
+     *   config.queryParams {Object}  extra query parameter name -> value (appended to the URL)
      *   config.headers     {Object}  extra request header name -> value
      *   config.body        {String}  request body for POST/PUT/PATCH
      *   config.timeout     {Number}  seconds to wait for a MID (async) response; default 60
      *
-     * @returns {Object} { ok, status, headers, body, error }
+     * @returns {Object} { ok, status, headers, body, error, url }
      */
     execute: function(config) {
         // gs.hasRole() already returns true for admins on any role; the explicit admin
@@ -69,6 +70,11 @@ RestExplorerEngine.prototype = {
 
         var useMid = !!config.midServer;
 
+        // We build the displayed "sent URL" ourselves because RESTMessageV2.getEndpoint()
+        // returns the raw endpoint string (e.g. with ${limit} tokens still intact). Track
+        // every setQueryParameter call so the final URL matches what the platform sends.
+        var urlParts = { endpoint: built.endpoint, params: [] };
+
         var sm;
         try {
             // Always build a transient message from a raw endpoint (see above); the
@@ -78,9 +84,9 @@ RestExplorerEngine.prototype = {
             sm.setHttpMethod(built.httpMethod || 'get');
             // Reproduce the saved function's own headers / query params so the request
             // matches the stored message before the user's overrides are layered on.
-            this._applyFunctionDefaults(sm, built, config.variables);
+            this._applyFunctionDefaults(sm, built, config.variables, urlParts);
         } catch (e) {
-            return this._fail('Could not build request for "' + built.endpoint + '": ' + e);
+            return this._fail('Could not build request for "' + built.endpoint + '": ' + e, null, this._buildRequestUrl(urlParts, config.variables));
         }
 
         // Fall back to the function's stored request body when the user left it blank.
@@ -91,13 +97,15 @@ RestExplorerEngine.prototype = {
         // --- Authentication -------------------------------------------------
         // Any failure here is returned to the caller; we never fire the request
         // with a half-applied or missing credential.
-        var authError = this._applyAuth(sm, config, useMid, built.endpoint, built.messageSysId);
+        var authError = this._applyAuth(sm, config, useMid, built.endpoint, built.messageSysId, urlParts);
         if (authError) {
-            return this._fail(authError);
+            return this._fail(authError, sm, this._buildRequestUrl(urlParts, config.variables));
         }
 
         // --- Variables, headers, body --------------------------------------
-        this._applyParameters(sm, config, { useUrl: useUrl, endpoint: built.endpoint });
+        this._applyParameters(sm, config, { useUrl: useUrl, endpoint: built.endpoint }, urlParts);
+
+        var requestUrl = this._buildRequestUrl(urlParts, config.variables);
 
         // --- Route + execute -----------------------------------------------
         if (useMid) {
@@ -113,9 +121,9 @@ RestExplorerEngine.prototype = {
             } else {
                 response = sm.execute();
             }
-            return this._normalize(response);
+            return this._normalize(response, requestUrl);
         } catch (e) {
-            return this._fail('Request execution failed: ' + e, sm);
+            return this._fail('Request execution failed: ' + e, sm, requestUrl);
         }
     },
 
@@ -123,7 +131,7 @@ RestExplorerEngine.prototype = {
      * Apply authentication to the message. Returns an error string on failure,
      * or null/undefined on success.
      */
-    _applyAuth: function(sm, config, useMid, endpoint, messageSysId) {
+    _applyAuth: function(sm, config, useMid, endpoint, messageSysId, urlParts) {
         switch (config.authType) {
 
             case 'basic':
@@ -143,7 +151,10 @@ RestExplorerEngine.prototype = {
 
             case 'apikey':
                 var key = config.apiKey || {};
-                if (!key.name || key.value == null) {
+                // Reject '' as well as null/undefined: an empty key value would pass
+                // straight through to setRequestHeader and fire a silent 401 (reachable
+                // in practice -- the widget's state restore blanks stored secrets).
+                if (!key.name || !key.value) {
                     return 'API key auth selected but the key name/value is missing.';
                 }
                 if (key.placement === 'query') {
@@ -155,6 +166,9 @@ RestExplorerEngine.prototype = {
                         sm.setStringParameterNoEscape(key.name, String(key.value));
                     } else {
                         sm.setQueryParameter(key.name, String(key.value));
+                        if (urlParts) {
+                            urlParts.params.push({ name: key.name, value: String(key.value) });
+                        }
                     }
                 } else {
                     sm.setRequestHeader(key.name, String(key.value));
@@ -276,6 +290,15 @@ RestExplorerEngine.prototype = {
                 candidates.push(stored[i].requestor);
             }
         }
+        // The OAuth profile itself, used as the requestor. In Direct URL mode there is
+        // no REST message record to key the token to, so "Get OAuth Token" mints against
+        // the entity profile (oauth_requestor = profile, context 'rest'); without this the
+        // interactively minted token would be invisible and OAuth would never work for a
+        // direct URL. Probed after the registered requestors so the common credential-page
+        // and REST-message paths don't pay an extra guaranteed-miss getToken lookup.
+        if (config.authProfile) {
+            candidates.push(String(config.authProfile));
+        }
         candidates.push('');
 
         var seen = {};
@@ -364,7 +387,7 @@ RestExplorerEngine.prototype = {
         return parts.join(' — ');
     },
 
-    _applyParameters: function(sm, config, options) {
+    _applyParameters: function(sm, config, options, urlParts) {
         options = options || {};
         var endpoint = options.endpoint || '';
         var name;
@@ -372,16 +395,20 @@ RestExplorerEngine.prototype = {
             for (name in config.variables) {
                 if (config.variables.hasOwnProperty(name)) {
                     var value = String(config.variables[name]);
-                    // A variable substitutes wherever ${name} appears (endpoint or body).
-                    // In Direct URL mode a variable with no matching ${name} token is instead
-                    // appended as a query parameter, so plain key/value pairs land on the
-                    // query string. The token check keeps a templated variable from being
-                    // both substituted and duplicated onto the query string.
-                    if (options.useUrl && !this._hasToken(endpoint, name) && !this._hasToken(config.body, name)) {
-                        sm.setQueryParameter(name, value);
-                    } else {
-                        // NoEscape: do not XML-escape values (faithful substitution).
-                        sm.setStringParameterNoEscape(name, value);
+                    // Variables are substitution-only: they replace ${name} tokens wherever
+                    // they appear in the endpoint or body. Query parameters are explicitly
+                    // provided via config.queryParams so the UI can keep the two intents separate.
+                    sm.setStringParameterNoEscape(name, value);
+                }
+            }
+        }
+        if (config.queryParams) {
+            for (name in config.queryParams) {
+                if (config.queryParams.hasOwnProperty(name)) {
+                    var qValue = String(config.queryParams[name]);
+                    sm.setQueryParameter(name, qValue);
+                    if (urlParts) {
+                        urlParts.params.push({ name: name, value: qValue });
                     }
                 }
             }
@@ -466,6 +493,25 @@ RestExplorerEngine.prototype = {
         return t > 0 ? t : 60;
     },
 
+    /** Build the final request URL from the endpoint plus every setQueryParameter call
+     *  recorded in urlParts. RESTMessageV2.getEndpoint() returns the raw endpoint string
+     *  (with ${token}s intact), so we reconstruct the sent URL ourselves to match what the
+     *  platform will actually transmit. Query values are URI-encoded; tokens that remain
+     *  unresolved are left visible, just as the platform will see them. */
+    _buildRequestUrl: function(urlParts, variables) {
+        var endpoint = urlParts && urlParts.endpoint ? String(urlParts.endpoint) : '';
+        if (!endpoint) { return ''; }
+        var url = this._substituteTokens(endpoint, variables || {});
+        var params = urlParts && urlParts.params ? urlParts.params : [];
+        if (params.length) {
+            var parts = params.map(function(p) {
+                return encodeURIComponent(p.name) + '=' + encodeURIComponent(p.value);
+            });
+            url += (url.indexOf('?') === -1 ? '?' : '&') + parts.join('&');
+        }
+        return url;
+    },
+
     /** Read a function's child name/value rows (headers or query params). */
     _readFnChildValues: function(table, fnId) {
         var out = [];
@@ -532,7 +578,7 @@ RestExplorerEngine.prototype = {
      * platform substitutes into setQueryParameter/setRequestHeader values on a rebuilt
      * transient message. Unresolved tokens are left intact for the platform to try.
      */
-    _applyFunctionDefaults: function(sm, built, variables) {
+    _applyFunctionDefaults: function(sm, built, variables, urlParts) {
         var headers = built.headers || [];
         for (var i = 0; i < headers.length; i++) {
             if (headers[i].name) {
@@ -544,7 +590,11 @@ RestExplorerEngine.prototype = {
         for (var j = 0; j < params.length; j++) {
             if (params[j].name) {
                 var pv = String(params[j].value == null ? '' : params[j].value);
-                sm.setQueryParameter(params[j].name, this._substituteTokens(pv, variables));
+                var substituted = this._substituteTokens(pv, variables);
+                sm.setQueryParameter(params[j].name, substituted);
+                if (urlParts) {
+                    urlParts.params.push({ name: params[j].name, value: substituted });
+                }
             }
         }
     },
@@ -560,23 +610,29 @@ RestExplorerEngine.prototype = {
     },
 
     /** Turn a RESTResponseV2 into the flat shape the widget renders. */
-    _normalize: function(response) {
+    _normalize: function(response, requestUrl) {
+        var result;
         if (response.haveError()) {
-            return {
+            result = {
                 ok: false,
                 status: response.getStatusCode(),
                 headers: this._headersToObject(response),
                 body: response.getBody(),
                 error: response.getErrorCode() + ': ' + response.getErrorMessage()
             };
+        } else {
+            result = {
+                ok: true,
+                status: response.getStatusCode(),
+                headers: this._headersToObject(response),
+                body: response.getBody(),
+                error: null
+            };
         }
-        return {
-            ok: true,
-            status: response.getStatusCode(),
-            headers: this._headersToObject(response),
-            body: response.getBody(),
-            error: null
-        };
+        if (requestUrl) {
+            result.url = requestUrl;
+        }
+        return result;
     },
 
     _headersToObject: function(response) {
@@ -613,8 +669,11 @@ RestExplorerEngine.prototype = {
         return out;
     },
 
-    _fail: function(message, sm) {
+    _fail: function(message, sm, requestUrl) {
         var result = { ok: false, status: null, headers: {}, body: null, error: message };
+        if (requestUrl) {
+            result.url = requestUrl;
+        }
         if (sm) {
             try {
                 result.requestBody = sm.getRequestBody();

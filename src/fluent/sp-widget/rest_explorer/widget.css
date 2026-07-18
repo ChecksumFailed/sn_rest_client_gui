@@ -13,6 +13,62 @@
 .rest-explorer pre.re-code {
   max-height: 420px;
   overflow: auto;
+  /* Drag the bottom-right handle to grow/shrink a section (e.g. a long response
+     body). 420px is only the default height, not a ceiling -- see below. */
+  resize: vertical;
+  min-height: 40px;
+}
+
+/* Resizing writes an inline height style; once the user has taken control,
+   drop the default cap so they can drag past it. */
+.rest-explorer pre.re-code[style*="height"] {
+  max-height: none;
+}
+
+/* When the response panel sits beside the builder (>= the lg breakpoint), the
+   builder is halved to col-lg-6 -- but its inner rows still lay out on the
+   viewport-based col-sm-* grid, which squishes every field to half of a half
+   (truncated selects, wrapping labels). Bootstrap's grid can't see container
+   width, so in that state stack the inner columns full-width instead, the same
+   way the grid itself stacks below the sm breakpoint. */
+@media (min-width: 1200px) {
+  .rest-explorer .re-narrow [class*="col-sm-"] {
+    float: none;
+    width: 100%;
+  }
+  /* Nested columns (the auth blocks nest col-sm-* directly inside a col-sm-8
+     without an inner .row) would otherwise indent 15px past their siblings
+     once stacked; align them with the parent column's content edge. */
+  .rest-explorer .re-narrow [class*="col-sm-"] [class*="col-sm-"] {
+    padding-left: 0;
+    padding-right: 0;
+  }
+
+  /* Equal-height columns when the builder and response sit side by side: the
+     taller column defines the row, the other panel stretches to match, so the
+     two bottom borders line up instead of ending at different heights. */
+  .rest-explorer .re-layout {
+    display: flex;
+    align-items: stretch;
+  }
+  .rest-explorer .re-layout > [class*="col-lg-"] > .panel {
+    height: 100%;
+    margin-bottom: 0;
+  }
+}
+
+/* Sent-request URL display: read-only, code-styled, wraps rather than
+   scrolls so the whole URL is always visible. */
+.rest-explorer .re-preview-url {
+  font-family: Menlo, Monaco, Consolas, "Courier New", monospace;
+  font-size: 12px;
+  background: #f5f5f5;
+  border: 1px solid #ddd;
+  border-radius: 4px;
+  padding: 6px 10px;
+  white-space: pre-wrap;
+  word-break: break-all;
+  color: #333;
 }
 
 .rest-explorer .re-kv {
@@ -27,6 +83,29 @@
 
 .rest-explorer .re-kv .btn {
   flex: 0 0 auto;
+}
+
+/* Response section header: a collapse toggle on the left, a copy button on the right. */
+.rest-explorer .re-section-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin: 10px 0 4px;
+}
+
+.rest-explorer .re-collapse {
+  font-weight: bold;
+  text-decoration: none;
+  cursor: pointer;
+}
+
+.rest-explorer .re-collapse .fa {
+  width: 12px;
+  margin-right: 4px;
+}
+
+.rest-explorer .re-copy .fa {
+  margin-right: 4px;
 }
 
 .rest-explorer .re-oauth-hint {

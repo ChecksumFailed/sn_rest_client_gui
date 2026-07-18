@@ -9,8 +9,8 @@
 
     <!-- On large screens the response sits to the right of the builder; below the
          lg breakpoint both stack, response underneath, as before. -->
-    <div class="row">
-    <div ng-class="c.resp ? 'col-lg-6' : 'col-lg-12'">
+    <div class="row re-layout">
+    <div ng-class="c.resp ? 'col-lg-6 re-narrow' : 'col-lg-12'">
     <!-- Request builder -->
     <div class="panel panel-default">
       <div class="panel-body">
@@ -58,7 +58,8 @@
           <div class="form-group col-sm-9">
             <label>Request URL</label>
             <input class="form-control" ng-model="c.req.endpoint"
-                   placeholder="https://host/path  (supports ${variable} substitution)">
+                   ng-blur="c.parseUrl()"
+                   placeholder="https://host/path?query=params">
           </div>
         </div>
 
@@ -112,7 +113,7 @@
               <input class="form-control" ng-model="c.req.requestorId" placeholder="sys_id">
             </div>
             <div class="col-sm-12" style="padding-left:0">
-              <button class="btn btn-default btn-sm" ng-click="c.getOAuthToken()"
+              <button type="button" class="btn btn-default btn-sm" ng-click="c.getOAuthToken($event)"
                       ng-disabled="!c.req.authProfile">
                 Get OAuth Token
               </button>
@@ -162,40 +163,52 @@
           </div>
         </div>
 
-        <!-- Variables and headers -->
+        <!-- Variables (REST Message only) and Query Params (both modes) -->
         <div class="row">
-          <div class="col-sm-6">
+          <div class="col-sm-6" ng-if="c.req.source === 'restMessage'">
             <label>Variables</label>
             <div class="re-kv" ng-repeat="kv in c.req.variablesList">
               <input class="form-control" ng-model="kv.k" placeholder="name">
               <input class="form-control" ng-model="kv.v" placeholder="value">
-              <button class="btn btn-default" ng-click="c.removeRow(c.req.variablesList, $index)">&times;</button>
+              <button type="button" class="btn btn-default" ng-click="c.removeRow(c.req.variablesList, $index)">&times;</button>
             </div>
-            <button class="btn btn-link" ng-click="c.addRow(c.req.variablesList)">+ variable</button>
-            <p class="help-block" ng-if="c.req.source === 'url'">
-              Added as a query parameter unless the URL or body has a matching <code>${name}</code>.
-            </p>
+            <button type="button" class="btn btn-link" ng-click="c.addRow(c.req.variablesList)">+ variable</button>
+            <p class="help-block">Substitutes <code>${name}</code> tokens in the endpoint and body.</p>
           </div>
-          <div class="col-sm-6">
+          <div ng-class="c.req.source === 'restMessage' ? 'col-sm-6' : 'col-sm-12'">
+            <label>Query Params</label>
+            <div class="re-kv" ng-repeat="kv in c.req.queryParamsList">
+              <input class="form-control" ng-model="kv.k" placeholder="name">
+              <input class="form-control" ng-model="kv.v" placeholder="value">
+              <button type="button" class="btn btn-default" ng-click="c.removeRow(c.req.queryParamsList, $index)">&times;</button>
+            </div>
+            <button type="button" class="btn btn-link" ng-click="c.addRow(c.req.queryParamsList)">+ query param</button>
+            <p class="help-block" ng-if="c.req.source === 'url'">Query params are extracted from the URL; add more here.</p>
+          </div>
+        </div>
+
+        <!-- Headers -->
+        <div class="row">
+          <div class="col-sm-12">
             <label>Headers</label>
             <div class="re-kv" ng-repeat="kv in c.req.headersList">
               <input class="form-control" ng-model="kv.k" placeholder="name">
               <input class="form-control" ng-model="kv.v" placeholder="value">
-              <button class="btn btn-default" ng-click="c.removeRow(c.req.headersList, $index)">&times;</button>
+              <button type="button" class="btn btn-default" ng-click="c.removeRow(c.req.headersList, $index)">&times;</button>
             </div>
-            <button class="btn btn-link" ng-click="c.addRow(c.req.headersList)">+ header</button>
+            <button type="button" class="btn btn-link" ng-click="c.addRow(c.req.headersList)">+ header</button>
           </div>
         </div>
 
         <!-- Body -->
         <div class="form-group">
           <label>Request Body</label>
-          <button class="btn btn-xs btn-default pull-right" ng-click="c.beautify()">Beautify JSON</button>
+          <button type="button" class="btn btn-xs btn-default pull-right" ng-click="c.beautify()">Beautify JSON</button>
           <textarea class="form-control re-code" rows="8" ng-model="c.req.body"
                     placeholder="Request payload (POST/PUT/PATCH)"></textarea>
         </div>
 
-        <button class="btn btn-primary" ng-click="c.send()" ng-disabled="c.loading || !c.canSend()">
+        <button type="button" class="btn btn-primary" ng-click="c.send()" ng-disabled="c.loading || !c.canSend()">
           <span ng-if="!c.loading">Send</span>
           <span ng-if="c.loading">Sending…</span>
         </button>
@@ -212,10 +225,45 @@
       </div>
       <div class="panel-body">
         <div ng-if="c.resp.error" class="re-error-block">{{c.resp.error}}</div>
-        <label>Response Headers</label>
-        <pre class="re-code">{{c.resp.headers | json}}</pre>
-        <label>Response Body</label>
-        <pre class="re-code">{{c.prettyBody}}</pre>
+
+        <div class="re-section-head" ng-if="c.prettyUrl">
+          <a href="" class="re-collapse" ng-click="c.ui.collapsed.url = !c.ui.collapsed.url">
+            <i class="fa" ng-class="c.ui.collapsed.url ? 'fa-caret-right' : 'fa-caret-down'"></i>
+            Request URL
+          </a>
+          <button type="button" class="btn btn-xs btn-default re-copy"
+                  ng-click="c.copy(c.prettyUrl, 'url')" title="Copy URL to clipboard">
+            <i class="fa" ng-class="c.ui.copied === 'url' ? 'fa-check' : 'fa-copy'"></i>
+            {{c.ui.copied === 'url' ? 'Copied' : 'Copy'}}
+          </button>
+        </div>
+        <div class="re-preview-url" ng-hide="!c.prettyUrl || c.ui.collapsed.url">{{c.prettyUrl}}</div>
+
+        <div class="re-section-head">
+          <a href="" class="re-collapse" ng-click="c.ui.collapsed.headers = !c.ui.collapsed.headers">
+            <i class="fa" ng-class="c.ui.collapsed.headers ? 'fa-caret-right' : 'fa-caret-down'"></i>
+            Response Headers
+          </a>
+          <button type="button" class="btn btn-xs btn-default re-copy"
+                  ng-click="c.copy(c.prettyHeaders, 'headers')" title="Copy headers to clipboard">
+            <i class="fa" ng-class="c.ui.copied === 'headers' ? 'fa-check' : 'fa-copy'"></i>
+            {{c.ui.copied === 'headers' ? 'Copied' : 'Copy'}}
+          </button>
+        </div>
+        <pre class="re-code" ng-hide="c.ui.collapsed.headers">{{c.prettyHeaders}}</pre>
+
+        <div class="re-section-head">
+          <a href="" class="re-collapse" ng-click="c.ui.collapsed.body = !c.ui.collapsed.body">
+            <i class="fa" ng-class="c.ui.collapsed.body ? 'fa-caret-right' : 'fa-caret-down'"></i>
+            Response Body
+          </a>
+          <button type="button" class="btn btn-xs btn-default re-copy"
+                  ng-click="c.copy(c.prettyBody, 'body')" title="Copy body to clipboard">
+            <i class="fa" ng-class="c.ui.copied === 'body' ? 'fa-check' : 'fa-copy'"></i>
+            {{c.ui.copied === 'body' ? 'Copied' : 'Copy'}}
+          </button>
+        </div>
+        <pre class="re-code" ng-hide="c.ui.collapsed.body">{{c.prettyBody}}</pre>
       </div>
     </div>
     </div>

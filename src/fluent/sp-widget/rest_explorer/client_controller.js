@@ -1,6 +1,11 @@
-api.controller = function($scope, $window) {
+api.controller = function($scope, $window, $timeout) {
     /* global angular */
     var c = this;
+
+    // Response-panel view state: which sections are collapsed (keyed by section name,
+    // so a new response resets them all with one assignment), and which section was
+    // last copied (drives the transient "Copied" checkmark on the copy buttons).
+    c.ui = { collapsed: {}, copied: '' };
 
     c.req = {
         source: 'restMessage',            // 'restMessage' | 'url'
@@ -16,6 +21,7 @@ api.controller = function($scope, $window) {
         timeout: 60,                      // seconds to wait for a MID (async) response
         apiKey: { placement: 'header', name: '', value: '' },
         variablesList: [],
+        queryParamsList: [],
         headersList: [],
         body: ''
     };
@@ -31,9 +37,95 @@ api.controller = function($scope, $window) {
     c.resp = null;
     c.loading = false;
 
+    // ---- Surviving the "Get OAuth Token" page reload ---------------------
+    // The OAuth authorization-code flow opens the platform's oauth_initiator.do in a
+    // popup; its provider callback (oauth_redirect.do) reloads this opener window once
+    // the token is stored -- native platform behavior we cannot suppress from the popup.
+    // That reload would otherwise drop the user back to a blank widget, losing the URL /
+    // message / auth selections they just set up. So we snapshot the request into
+    // sessionStorage right before opening the popup and restore it on the next init.
+    var STATE_KEY = 'x_1676196_rest_gui.req';
+    var STATE_TTL_MS = 30 * 60 * 1000; // ignore a stale snapshot from an old session
+
+    function _saveState() {
+        try {
+            // Drop secrets from the snapshot: sessionStorage is same-origin and cleared
+            // on tab close, but there is no reason to persist a password/API key across a
+            // reload (the OAuth flow that triggers the save does not use them anyway).
+            var snapshot = angular.copy(c.req);
+            if (snapshot.basic) { snapshot.basic.password = ''; }
+            if (snapshot.apiKey) { snapshot.apiKey.value = ''; }
+            $window.sessionStorage.setItem(STATE_KEY, JSON.stringify({ ts: Date.now(), req: snapshot }));
+        } catch (e) { /* storage unavailable -- state just won't survive the reload */ }
+    }
+
+    function _clearState() {
+        try { $window.sessionStorage.removeItem(STATE_KEY); } catch (e) { /* nothing to clear */ }
+    }
+
+    (function _restoreState() {
+        var saved;
+        try {
+            var raw = $window.sessionStorage.getItem(STATE_KEY);
+            if (!raw) { return; }
+            $window.sessionStorage.removeItem(STATE_KEY); // one-shot: consume it
+            saved = JSON.parse(raw);
+        } catch (e) { return; }
+        if (!saved || !saved.ts || (Date.now() - saved.ts) > STATE_TTL_MS || !saved.req) { return; }
+        angular.extend(c.req, saved.req);
+        // The Method dropdown's options (c.methods) are not part of c.req; reload them so
+        // the restored method shows its label instead of a blank "unknown option" entry.
+        // Deferred so the SP server proxy is fully wired before the call.
+        if (c.req.source === 'restMessage' && c.req.restMessage) {
+            $timeout(function() { _fetchMethods(c.req.restMessage); });
+        }
+    })();
+
     // ---- Key/value row helpers -------------------------------------------
     c.addRow = function(list) { list.push({ k: '', v: '' }); };
     c.removeRow = function(list, i) { list.splice(i, 1); };
+
+    // ---- Direct URL parsing ----------------------------------------------
+    // When the user types or pastes a URL with a query string, extract the params
+    // into the Query Params section and strip them from the URL field. Existing
+    // manual params are kept; params already present are updated by key.
+    c.parseUrl = function() {
+        if (c.req.source !== 'url' || !c.req.endpoint) { return; }
+        var parsed = _parseUrl(c.req.endpoint);
+        if (!parsed) { return; }
+        c.req.endpoint = parsed.url;
+        _mergeQueryParams(c.req.queryParamsList, parsed.params);
+    };
+
+    function _parseUrl(url) {
+        try {
+            var u = new URL(url);
+            var params = [];
+            u.searchParams.forEach(function(value, name) {
+                params.push({ k: name, v: value });
+            });
+            u.search = '';
+            return { url: u.toString(), params: params };
+        } catch (e) {
+            return null;
+        }
+    }
+
+    function _mergeQueryParams(list, newParams) {
+        newParams.forEach(function(p) {
+            var found = false;
+            for (var i = 0; i < list.length; i++) {
+                if (list[i].k === p.k) {
+                    list[i].v = p.v;
+                    found = true;
+                    break;
+                }
+            }
+            if (!found) {
+                list.push(p);
+            }
+        });
+    }
 
     // ---- Switching request source (REST message vs raw URL) --------------
     c.onSourceChange = function() {
@@ -54,10 +146,16 @@ api.controller = function($scope, $window) {
         c.methods = [];
         c.req.variablesList = [];
         if (!c.req.restMessage) { return; }
-        c.server.get({ action: 'getMethods', restMessage: c.req.restMessage }).then(function(r) {
+        _fetchMethods(c.req.restMessage);
+    };
+
+    // Shared by loadMethods and the post-OAuth state restore (which must not go
+    // through loadMethods itself -- that would clear the just-restored selection).
+    function _fetchMethods(restMessage) {
+        return c.server.get({ action: 'getMethods', restMessage: restMessage }).then(function(r) {
             c.methods = r.data.methods || [];
         });
-    };
+    }
 
     // ---- React to a method selection -------------------------------------
     // Preselect the stored auth for this method, then load its variables.
@@ -117,8 +215,12 @@ api.controller = function($scope, $window) {
     // the selected REST message record when there is one, else the profile
     // itself (the engine searches every requestor registered on the profile,
     // so either way the token is found).
-    c.getOAuthToken = function() {
+    c.getOAuthToken = function($event) {
+        if ($event) { $event.preventDefault(); }
         if (!c.req.authProfile) { return; }
+        // Preserve the current request: the popup's provider callback reloads this page,
+        // and _restoreState() rehydrates it on the way back in.
+        _saveState();
         var onMessage = c.req.source === 'restMessage' && c.req.restMessage;
         var params = {
             oauth_requestor_context: onMessage ? 'rest_message' : 'rest',
@@ -129,7 +231,24 @@ api.controller = function($scope, $window) {
         var query = Object.keys(params).map(function(k) {
             return encodeURIComponent(k) + '=' + encodeURIComponent(params[k]);
         }).join('&');
-        $window.open('/oauth_initiator.do?' + query, 'rest_gui_oauth_popup', 'width=800,height=700');
+        var popup = $window.open('/oauth_initiator.do?' + query, 'rest_gui_oauth_popup', 'width=800,height=700');
+        if (!popup) {
+            // Popup blocked: no provider callback will ever reload this page, so the
+            // snapshot would hijack the next unrelated init. Discard it now.
+            _clearState();
+            return;
+        }
+        // Same problem if the user closes the popup without completing the flow: watch
+        // for the close and discard the snapshot after a short grace period. On success
+        // the callback reloads this window, killing these timers before the clear runs
+        // (the grace covers a reload that starts just after the popup closes). Plain
+        // timers, not $timeout: nothing here touches the model.
+        var watch = $window.setInterval(function() {
+            if (popup.closed) {
+                $window.clearInterval(watch);
+                $window.setTimeout(_clearState, 5000);
+            }
+        }, 1000);
     };
 
     // ---- Whether Send is allowed for the current source ------------------
@@ -165,6 +284,7 @@ api.controller = function($scope, $window) {
             timeout: c.req.timeout,
             apiKey: c.req.apiKey,
             variables: _pairsToObject(c.req.variablesList),
+            queryParams: _pairsToObject(c.req.queryParamsList),
             headers: _pairsToObject(c.req.headersList),
             body: c.req.body
         };
@@ -174,13 +294,64 @@ api.controller = function($scope, $window) {
         c.server.get({ action: 'execute', config: config }).then(function(r) {
             c.loading = false;
             c.resp = r.data.result;
+            c.prettyUrl = _prettyUrl(c.resp);
             c.prettyBody = _prettyPrint(c.resp);
+            c.prettyHeaders = _prettyHeaders(c.resp);
+            c.ui.collapsed = {};
         }, function() {
             c.loading = false;
             c.resp = { ok: false, status: null, error: 'Client-server call failed.', headers: {}, body: null };
-            c.prettyBody = '';
+            c.prettyUrl = '';
+            c.prettyBody = _prettyPrint(c.resp);
+            c.prettyHeaders = _prettyHeaders(c.resp);
+            c.ui.collapsed = {};
         });
     };
+
+    // ---- Copy a section's text to the clipboard --------------------------
+    // `what` names the section ('headers' | 'body') so the button can flash a
+    // transient "Copied" acknowledgement. Uses the async Clipboard API where the
+    // browser exposes it, falling back to a hidden-textarea execCommand copy.
+    c.copy = function(text, what) {
+        var value = text == null ? '' : String(text);
+        var done = function() {
+            // done() may run as a native-promise microtask, outside Angular's digest;
+            // route the model change through $timeout so the checkmark always renders.
+            $timeout(function() {
+                c.ui.copied = what;
+                $timeout(function() {
+                    if (c.ui.copied === what) { c.ui.copied = ''; }
+                }, 1500);
+            });
+        };
+        var nav = $window.navigator;
+        if (nav && nav.clipboard && nav.clipboard.writeText) {
+            nav.clipboard.writeText(value).then(done, function() { _fallbackCopy(value, done); });
+        } else {
+            _fallbackCopy(value, done);
+        }
+    };
+
+    function _fallbackCopy(value, done) {
+        try {
+            var doc = $window.document;
+            var ta = doc.createElement('textarea');
+            ta.value = value;
+            ta.style.position = 'fixed';
+            ta.style.opacity = '0';
+            doc.body.appendChild(ta);
+            ta.focus();
+            ta.select();
+            var ok = doc.execCommand('copy');
+            doc.body.removeChild(ta);
+            // execCommand reports failure via its return value, not an exception;
+            // only acknowledge when the text actually reached the clipboard.
+            if (ok) { done(); }
+        } catch (e) {
+            // Clipboard unavailable (permissions/older browser) -- fail quietly rather
+            // than throwing; the user can still select the text manually.
+        }
+    }
 
     function _pairsToObject(list) {
         var obj = {};
@@ -205,6 +376,21 @@ api.controller = function($scope, $window) {
             } catch (e) { /* fall through, show raw */ }
         }
         return body;
+    }
+
+    // The actual URL sent, as returned by the engine. The server reads this from the
+    // RESTMessageV2 after query parameters are applied, so it reflects the real request
+    // (not the client's earlier live approximation).
+    function _prettyUrl(resp) {
+        return resp && resp.url ? String(resp.url) : '';
+    }
+
+    // Pretty-print the response headers as JSON text. Kept as a real string (rather
+    // than the `| json` filter) so the copy button has an exact value to hand off.
+    // headers is always a plain object of string values (built server-side and JSON
+    // round-tripped), so stringify cannot throw.
+    function _prettyHeaders(resp) {
+        return resp && resp.headers ? JSON.stringify(resp.headers, null, 2) : '';
     }
 
     function _headerValue(headers, name) {
