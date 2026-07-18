@@ -92,9 +92,6 @@
                 // Same fallback as _resolveFunction: a function may inherit the
                 // parent message's endpoint.
                 endpoint: fn.getValue('rest_endpoint') || parent.getValue('rest_endpoint'),
-                // Defined HTTP query parameters (param_defs), in order -- the client's
-                // preview appends them the same way _applyFunctionDefaults will.
-                queryParams: engine._readFnChildValues('sys_rest_message_fn_param_defs', fn.getUniqueValue()),
                 // Stored auth, resolved through inherit_from_parent, so the client can
                 // preselect the auth dropdown + profile when this method is chosen.
                 auth: engine._mapStoredAuth(parent, fn)
