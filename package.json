@@ -1,6 +1,6 @@
 {
   "name": "rest-client-gui",
-  "version": "0.0.1",
+  "version": "0.1.0",
   "description": "REST Explorer: a Swagger-UI-like Service Portal widget for exercising ServiceNow REST Messages, built as a now-sdk (Fluent) scoped application.",
   "license": "UNLICENSED",
   "imports": {
