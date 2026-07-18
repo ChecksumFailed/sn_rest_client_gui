@@ -56,6 +56,33 @@ normalization. The suite runs automatically before every `npm run build` (via th
 so a failing test blocks the build. Build through `npm run build` rather than bare `now-sdk build`
 so the tests run.
 
+### Screenshots
+
+Playwright can capture the live widget in Service Portal for sharing in PRs or docs. This is **not**
+part of `npm test` — it requires a deployed instance and credentials.
+
+```bash
+# First-time only: install the Chromium browser binary.
+npm run screenshots:install
+
+# Copy the template and add your instance credentials.
+# .env is gitignored and must never be committed.
+cp .env.example .env
+# edit .env
+
+npm run screenshots
+```
+
+Captured images:
+
+- `screenshots/rest-explorer-default.png` — REST Message builder mode.
+- `screenshots/rest-explorer-direct-url.png` — Direct URL builder mode.
+- `screenshots/rest-explorer-oauth.png` — OAuth 2.0 profile picker visible.
+
+Credentials come from a `.env` file (or exported environment variables):
+`SN_INSTANCE`, `SN_USERNAME`, `SN_PASSWORD`. Optional: `SN_PAGE_ID`
+(default `rest_explorer`), `SN_PORTAL` (default `/`).
+
 ## Using it
 
 1. Pick a **REST Message** and one of its **HTTP Methods**.
