@@ -7,6 +7,12 @@ MID Server** by fetching the token in script and injecting it as a manual `Autho
 
 > This tool executes existing REST Messages. It does **not** create or modify REST Message records.
 
+## Screenshots
+
+| Default view | Direct URL mode | OAuth 2.0 auth |
+|---|---|---|
+| ![Default view of the Outbound REST Console](screenshots/rest-explorer-default.png) | ![Direct URL mode with query params parsed out of a pasted URL](screenshots/rest-explorer-direct-url.png) | ![OAuth 2.0 authentication type selected, showing the entity profile picker](screenshots/rest-explorer-oauth.png) |
+
 ## Components
 
 Built as a **now-sdk (ServiceNow Fluent) scoped application** — scope `x_1676196_rest_gui`. Each Fluent
