@@ -84,14 +84,14 @@
         fn.orderBy('function_name');
         fn.query();
         while (fn.next()) {
+            // Same fallback as _resolveFunction: a function may inherit the
+            // parent message's endpoint.
+            var endpoint = fn.getValue('rest_endpoint') || parent.getValue('rest_endpoint');
             methods.push({
-                // Just the function name: the response panel shows the actual sent URL.
-                label: fn.getValue('function_name'),
+                label: fn.getValue('function_name') + '  (' + endpoint + ')',
                 value: fn.getValue('function_name'),
                 httpMethod: fn.getValue('http_method'),
-                // Same fallback as _resolveFunction: a function may inherit the
-                // parent message's endpoint.
-                endpoint: fn.getValue('rest_endpoint') || parent.getValue('rest_endpoint'),
+                endpoint: endpoint,
                 // Stored auth, resolved through inherit_from_parent, so the client can
                 // preselect the auth dropdown + profile when this method is chosen.
                 auth: engine._mapStoredAuth(parent, fn)
