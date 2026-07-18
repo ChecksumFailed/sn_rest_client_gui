@@ -1,0 +1,21 @@
+{
+  "name": "rest-client-gui",
+  "version": "0.0.1",
+  "description": "REST Explorer: a Swagger-UI-like Service Portal widget for exercising ServiceNow REST Messages, built as a now-sdk (Fluent) scoped application.",
+  "license": "UNLICENSED",
+  "imports": {
+    "#now:*": "./@types/servicenow/fluent/*/index.js"
+  },
+  "scripts": {
+    "test": "node --test",
+    "prebuild": "npm test",
+    "build": "now-sdk build",
+    "deploy": "now-sdk install",
+    "transform": "now-sdk transform",
+    "types": "now-sdk dependencies"
+  },
+  "devDependencies": {
+    "@servicenow/sdk": "4.8.1",
+    "@servicenow/glide": "27.0.5"
+  }
+}

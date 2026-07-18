@@ -1,0 +1,566 @@
+/**
+ * Unit tests for RestExplorerEngine (the server-side broker).
+ *
+ * The engine is a ServiceNow Script Include that relies on platform globals
+ * (Class, gs, GlideRecord, sn_ws, sn_auth). We load the raw source into a
+ * vm sandbox with mocked globals so the pure logic -- auth branching, the
+ * cross-scope function resolve, MID async routing, validation, normalization --
+ * can be exercised in plain Node with no instance. Run via `node --test`
+ * (wired into the build through the `prebuild` npm hook).
+ */
+import { test } from 'node:test'
+import assert from 'node:assert/strict'
+import { readFileSync } from 'node:fs'
+import { fileURLToPath } from 'node:url'
+import { dirname, join } from 'node:path'
+import vm from 'node:vm'
+
+const HERE = dirname(fileURLToPath(import.meta.url))
+const ENGINE_PATH = join(HERE, '..', 'src', 'fluent', 'script-include', 'RestExplorerEngine.js')
+const ENGINE_SOURCE = readFileSync(ENGINE_PATH, 'utf8')
+
+// --- Mocks -----------------------------------------------------------------
+
+/** A RESTMessageV2 stand-in that records every call for assertions. */
+function makeSpyMessage(response) {
+    const calls = []
+    const rec = (name) => (...args) => { calls.push({ name, args }) }
+    const msg = {
+        calls,
+        setEndpoint: rec('setEndpoint'),
+        setHttpMethod: rec('setHttpMethod'),
+        setRequestHeader: rec('setRequestHeader'),
+        setQueryParameter: rec('setQueryParameter'),
+        setStringParameterNoEscape: rec('setStringParameterNoEscape'),
+        setBasicAuth: rec('setBasicAuth'),
+        setAuthenticationProfile: rec('setAuthenticationProfile'),
+        setRequestBody: rec('setRequestBody'),
+        setMIDServer: rec('setMIDServer'),
+        getRequestBody: () => '',
+        execute() { calls.push({ name: 'execute', args: [] }); return response },
+        executeAsync() {
+            calls.push({ name: 'executeAsync', args: [] })
+            return Object.assign({
+                waitForResponse: (s) => calls.push({ name: 'waitForResponse', args: [s] }),
+            }, response)
+        },
+    }
+    // Convenience: names of calls in order, and a lookup for the first of a name.
+    msg.names = () => calls.map((c) => c.name)
+    msg.first = (name) => calls.find((c) => c.name === name)
+    msg.all = (name) => calls.filter((c) => c.name === name)
+    return msg
+}
+
+function makeResponse({ error = false, status = 200, headers = {}, body = '{}', errorCode = '', errorMessage = '' } = {}) {
+    return {
+        haveError: () => error,
+        getStatusCode: () => status,
+        getHeaders: () => headers,
+        getBody: () => body,
+        getErrorCode: () => errorCode,
+        getErrorMessage: () => errorMessage,
+    }
+}
+
+/** GlideRecord mock driven by an in-memory table map: { table: [rows...] }. */
+function makeGlideRecordClass(tables) {
+    return function GlideRecord(table) {
+        let rows = (tables[table] || []).slice()
+        const queries = []
+        let idx = -1
+        let current = null
+        return {
+            isValid: () => Object.prototype.hasOwnProperty.call(tables, table),
+            get(field, value) {
+                if (value === undefined) { value = field; field = 'sys_id' }
+                current = rows.find((r) => String(r[field]) === String(value)) || null
+                return !!current
+            },
+            addQuery(f, v) { queries.push([f, v]) },
+            addEncodedQuery() {},
+            orderBy() {},
+            query() {
+                rows = rows.filter((r) => queries.every(([f, v]) => String(r[f]) === String(v)))
+                idx = -1
+            },
+            next() { idx += 1; if (idx < rows.length) { current = rows[idx]; return true } return false },
+            getValue(f) { return current && current[f] != null ? current[f] : '' },
+            getUniqueValue() { return current ? current.sys_id : '' },
+        }
+    }
+}
+
+/**
+ * Load the engine into a fresh sandbox and return an instance plus the pieces
+ * the tests want to inspect.
+ */
+function loadEngine({ hasRole, tables = {}, response, sn_auth = {} } = {}) {
+    const allow = hasRole || (() => true)
+    const msg = makeSpyMessage(response || makeResponse())
+    const warnings = []
+    const sandbox = {
+        Class: { create: () => function () { if (this.initialize) this.initialize.apply(this, arguments) } },
+        gs: {
+            hasRole: (r) => allow(r),
+            warn: (m) => warnings.push(String(m)),
+            getProperty: (k, d) => d,
+        },
+        GlideRecord: makeGlideRecordClass(tables),
+        sn_ws: { RESTMessageV2: function () { return msg } },
+        sn_auth,
+    }
+    vm.createContext(sandbox)
+    vm.runInContext(ENGINE_SOURCE, sandbox)
+    const Engine = sandbox.RestExplorerEngine
+    return { engine: new Engine(), msg, warnings, Engine }
+}
+
+const ROLE = 'x_1676196_rest_gui.user'
+
+// A ready-made REST Message ("Cat Facts / Get Random Fact") for resolve tests.
+function catFactsTables(extra = {}) {
+    return {
+        sys_rest_message: [{ sys_id: 'rm1', name: 'Cat Facts', rest_endpoint: '' }],
+        sys_rest_message_fn: [{
+            sys_id: 'fn1', rest_message: 'rm1', function_name: 'Get Random Fact',
+            http_method: 'get', rest_endpoint: 'https://catfact.ninja/fact?max_length=${max_length}',
+            content: '',
+        }],
+        sys_rest_message_fn_headers: extra.headers || [],
+        sys_rest_message_fn_param_defs: extra.params || [],
+    }
+}
+
+// --- Role gate -------------------------------------------------------------
+
+test('execute() refuses a caller without the role or admin', () => {
+    const { engine, msg } = loadEngine({ hasRole: () => false })
+    const r = engine.execute({ source: 'url', endpoint: 'https://x' })
+    assert.equal(r.ok, false)
+    assert.match(r.error, /role required/)
+    assert.equal(msg.calls.length, 0, 'no request should be built when denied')
+})
+
+test('execute() allows an admin even without the explorer role', () => {
+    const { engine } = loadEngine({ hasRole: (r) => r === 'admin' })
+    const r = engine.execute({ source: 'url', endpoint: 'https://x' })
+    assert.equal(r.ok, true)
+})
+
+// --- Validation ------------------------------------------------------------
+
+test('url mode requires an endpoint', () => {
+    const { engine } = loadEngine()
+    const r = engine.execute({ source: 'url' })
+    assert.equal(r.ok, false)
+    assert.match(r.error, /URL is required/)
+})
+
+test('rest-message mode requires restMessage and method', () => {
+    const { engine } = loadEngine()
+    assert.match(engine.execute({ restMessage: 'Cat Facts' }).error, /required/)
+    assert.match(engine.execute({ method: 'get' }).error, /required/)
+})
+
+// --- URL mode --------------------------------------------------------------
+
+test('url mode builds a transient message and returns a normalized ok result', () => {
+    const { engine, msg } = loadEngine({
+        response: makeResponse({ status: 200, headers: { 'Content-Type': 'application/json' }, body: '{"fact":"hi"}' }),
+    })
+    const r = engine.execute({ source: 'url', endpoint: 'https://catfact.ninja/fact', httpMethod: 'get' })
+    assert.equal(r.ok, true)
+    assert.equal(r.status, 200)
+    assert.equal(r.body, '{"fact":"hi"}')
+    assert.equal(msg.first('setEndpoint').args[0], 'https://catfact.ninja/fact')
+    assert.equal(msg.first('setHttpMethod').args[0], 'get')
+    assert.ok(msg.first('execute'), 'a direct (non-MID) call uses execute()')
+    assert.equal(msg.first('executeAsync'), undefined)
+})
+
+test('url mode defaults the HTTP method to get', () => {
+    const { engine, msg } = loadEngine()
+    engine.execute({ source: 'url', endpoint: 'https://x' })
+    assert.equal(msg.first('setHttpMethod').args[0], 'get')
+})
+
+// --- REST Message mode / cross-scope resolve -------------------------------
+
+test('rest-message mode resolves the function endpoint via GlideRecord (cross-scope safe)', () => {
+    const { engine, msg } = loadEngine({ tables: catFactsTables() })
+    const r = engine.execute({ source: 'restMessage', restMessage: 'Cat Facts', method: 'Get Random Fact' })
+    assert.equal(r.ok, true)
+    assert.equal(msg.first('setEndpoint').args[0], 'https://catfact.ninja/fact?max_length=${max_length}')
+    assert.equal(msg.first('setHttpMethod').args[0], 'get')
+})
+
+test('rest-message mode resolves by sys_id too (the dropdown sends sys_id, not name)', () => {
+    const { engine, msg } = loadEngine({ tables: catFactsTables() })
+    const r = engine.execute({ source: 'restMessage', restMessage: 'rm1', method: 'Get Random Fact' })
+    assert.equal(r.ok, true)
+    assert.equal(msg.first('setEndpoint').args[0], 'https://catfact.ninja/fact?max_length=${max_length}')
+})
+
+test('rest-message mode errors clearly when the message is not found', () => {
+    const { engine } = loadEngine({ tables: { sys_rest_message: [] } })
+    const r = engine.execute({ source: 'restMessage', restMessage: 'Nope', method: 'get' })
+    assert.equal(r.ok, false)
+    assert.match(r.error, /was not found/)
+})
+
+test('rest-message mode applies the function static headers and query params', () => {
+    const tables = catFactsTables({
+        headers: [{ sys_id: 'h1', rest_message_function: 'fn1', name: 'Accept', value: 'application/json' }],
+        params: [{ sys_id: 'p1', rest_message_function: 'fn1', name: 'limit', value: '5' }],
+    })
+    const { engine, msg } = loadEngine({ tables })
+    engine.execute({ source: 'restMessage', restMessage: 'Cat Facts', method: 'Get Random Fact' })
+    assert.deepEqual(msg.first('setRequestHeader').args, ['Accept', 'application/json'])
+    assert.deepEqual(msg.first('setQueryParameter').args, ['limit', '5'])
+})
+
+test('defined query params / headers with ${token} values resolve from user variables', () => {
+    // Real-world pattern (e.g. Yahoo Finance): bare endpoint, param_defs rows whose
+    // VALUE is itself a substitution token (s=${symbol}). The engine resolves the
+    // tokens it has variables for instead of relying on the platform substituting
+    // into setQueryParameter/setRequestHeader values on a rebuilt transient message.
+    const tables = catFactsTables({
+        headers: [{ sys_id: 'h1', rest_message_function: 'fn1', name: 'X-Trace', value: '${trace}' }],
+        params: [
+            { sys_id: 'p1', rest_message_function: 'fn1', name: 's', value: '${symbol}', order: '100' },
+            { sys_id: 'p2', rest_message_function: 'fn1', name: 'f', value: 'l1', order: '200' },
+        ],
+    })
+    const { engine, msg } = loadEngine({ tables })
+    engine.execute({
+        source: 'restMessage', restMessage: 'Cat Facts', method: 'Get Random Fact',
+        variables: { symbol: 'AAPL', trace: 't-1' },
+    })
+    const q = Object.fromEntries(msg.all('setQueryParameter').map((c) => c.args))
+    assert.deepEqual(q, { s: 'AAPL', f: 'l1' })
+    assert.deepEqual(msg.first('setRequestHeader').args, ['X-Trace', 't-1'])
+})
+
+test('an unresolved ${token} in a defined query param is left intact for the platform', () => {
+    const tables = catFactsTables({
+        params: [{ sys_id: 'p1', rest_message_function: 'fn1', name: 's', value: '${symbol}', order: '100' }],
+    })
+    const { engine, msg } = loadEngine({ tables })
+    engine.execute({ source: 'restMessage', restMessage: 'Cat Facts', method: 'Get Random Fact' })
+    assert.deepEqual(msg.first('setQueryParameter').args, ['s', '${symbol}'])
+})
+
+test('function default body is used only when the user leaves the body blank', () => {
+    const tables = catFactsTables()
+    tables.sys_rest_message_fn[0].content = '{"default":true}'
+    // blank user body -> falls back to the function content
+    let h = loadEngine({ tables })
+    h.engine.execute({ source: 'restMessage', restMessage: 'Cat Facts', method: 'Get Random Fact' })
+    assert.equal(h.msg.first('setRequestBody').args[0], '{"default":true}')
+    // user body wins
+    h = loadEngine({ tables })
+    h.engine.execute({ source: 'restMessage', restMessage: 'Cat Facts', method: 'Get Random Fact', body: '{"mine":1}' })
+    assert.equal(h.msg.first('setRequestBody').args[0], '{"mine":1}')
+})
+
+// --- Authentication --------------------------------------------------------
+
+test('basic auth (profile) sets the basic authentication profile', () => {
+    const { engine, msg } = loadEngine()
+    engine.execute({ source: 'url', endpoint: 'https://x', authType: 'basic', authProfile: 'prof123' })
+    assert.deepEqual(msg.first('setAuthenticationProfile').args, ['basic', 'prof123'])
+})
+
+test('basic auth (profile) fails when no profile is chosen', () => {
+    const { engine } = loadEngine()
+    const r = engine.execute({ source: 'url', endpoint: 'https://x', authType: 'basic' })
+    assert.match(r.error, /no Basic Auth profile/)
+})
+
+test('basic auth (manual) calls setBasicAuth with the typed credentials', () => {
+    const { engine, msg } = loadEngine()
+    engine.execute({
+        source: 'url', endpoint: 'https://x', authType: 'basic',
+        basic: { mode: 'manual', username: 'joe', password: 'secret' },
+    })
+    assert.deepEqual(msg.first('setBasicAuth').args, ['joe', 'secret'])
+})
+
+test('basic auth (manual) requires a username', () => {
+    const { engine } = loadEngine()
+    const r = engine.execute({
+        source: 'url', endpoint: 'https://x', authType: 'basic',
+        basic: { mode: 'manual', username: '', password: 'x' },
+    })
+    assert.match(r.error, /no username/)
+})
+
+test('api key in a header vs a query param', () => {
+    let h = loadEngine()
+    h.engine.execute({ source: 'url', endpoint: 'https://x', authType: 'apikey', apiKey: { placement: 'header', name: 'X-API-Key', value: 'k' } })
+    assert.deepEqual(h.msg.first('setRequestHeader').args, ['X-API-Key', 'k'])
+
+    // Query placement appends a REAL query parameter when the endpoint has no
+    // ${token} -- substitution alone would silently drop the key and the request
+    // would fire unauthenticated.
+    h = loadEngine()
+    h.engine.execute({ source: 'url', endpoint: 'https://x', authType: 'apikey', apiKey: { placement: 'query', name: 'api_key', value: 'k' } })
+    assert.deepEqual(h.msg.first('setQueryParameter').args, ['api_key', 'k'])
+    assert.equal(h.msg.all('setStringParameterNoEscape').length, 0)
+})
+
+test('api key (query) substitutes instead when the endpoint has a matching ${token}', () => {
+    const { engine, msg } = loadEngine()
+    engine.execute({ source: 'url', endpoint: 'https://x?key=${api_key}', authType: 'apikey', apiKey: { placement: 'query', name: 'api_key', value: 'k' } })
+    assert.deepEqual(msg.first('setStringParameterNoEscape').args, ['api_key', 'k'])
+    assert.equal(msg.all('setQueryParameter').length, 0)
+})
+
+test('unknown auth type is rejected', () => {
+    const { engine } = loadEngine()
+    const r = engine.execute({ source: 'url', endpoint: 'https://x', authType: 'weird' })
+    assert.match(r.error, /Unknown authentication type/)
+})
+
+// --- OAuth (the MID-server workaround) -------------------------------------
+
+function oauthMock({ accessToken = 'TOKEN', expiresIn = 9999, cached = true, refreshedAccessToken = 'REFRESHED' } = {}) {
+    const calls = { requestTokenByRequest: 0, params: [], midServer: null }
+    const cachedToken = {
+        getExpiresIn: () => expiresIn,
+        getAccessToken: () => accessToken,
+    }
+    const refreshedToken = {
+        getExpiresIn: () => 9999,
+        getAccessToken: () => refreshedAccessToken,
+    }
+    return {
+        calls,
+        GlideOAuthClient: function () {
+            return {
+                getToken: () => (cached ? cachedToken : null),
+                requestTokenByRequest: () => {
+                    calls.requestTokenByRequest += 1
+                    return { getToken: () => refreshedToken }
+                },
+            }
+        },
+        GlideOAuthClientRequest: function () {
+            return {
+                setParameter: (k, v) => calls.params.push([k, v]),
+                setMIDServer: (m) => { calls.midServer = m },
+            }
+        },
+    }
+}
+
+test('oauth injects a manual Bearer header and disables record auth', () => {
+    const { engine, msg } = loadEngine({ sn_auth: oauthMock({ accessToken: 'ABC' }) })
+    const r = engine.execute({ source: 'url', endpoint: 'https://x', authType: 'oauth', authProfile: 'oap1' })
+    assert.equal(r.ok, true)
+    assert.deepEqual(msg.first('setRequestHeader').args, ['Authorization', 'Bearer ABC'])
+    assert.deepEqual(msg.first('setAuthenticationProfile').args, ['no_authentication'])
+})
+
+test('oauth refreshes an expiring token via requestTokenByRequest', () => {
+    const auth = oauthMock({ expiresIn: 10, refreshedAccessToken: 'NEW' })
+    const { engine, msg } = loadEngine({ sn_auth: auth })
+    const r = engine.execute({ source: 'url', endpoint: 'https://x', authType: 'oauth', authProfile: 'oap1' })
+    assert.equal(r.ok, true)
+    assert.equal(auth.calls.requestTokenByRequest, 1, 'an expiring token must be refreshed')
+    assert.deepEqual(msg.first('setRequestHeader').args, ['Authorization', 'Bearer NEW'])
+    const params = Object.fromEntries(auth.calls.params)
+    assert.equal(params.oauth_provider_profile, 'oap1')
+    assert.equal(params.oauth_requestor_context, 'rest')
+})
+
+test('oauth requestor id is passed on the token request when supplied', () => {
+    const auth = oauthMock({ cached: false })
+    const { engine } = loadEngine({ sn_auth: auth })
+    engine.execute({ source: 'url', endpoint: 'https://x', authType: 'oauth', authProfile: 'oap1', requestorId: 'req42' })
+    const params = Object.fromEntries(auth.calls.params)
+    assert.equal(params.oauth_requestor, 'req42')
+})
+
+test('oauth + MID routes the token request itself through the MID server', () => {
+    const auth = oauthMock({ cached: false })
+    const { engine, msg } = loadEngine({ sn_auth: auth })
+    const r = engine.execute({ source: 'url', endpoint: 'https://x', authType: 'oauth', authProfile: 'oap1', midServer: 'MID01' })
+    assert.equal(r.ok, true)
+    assert.equal(auth.calls.midServer, 'MID01', 'the token request must be MID-routed too')
+    assert.deepEqual(msg.first('setMIDServer').args, ['MID01'])
+    assert.ok(msg.first('executeAsync'), 'the message itself stays async over MID')
+})
+
+test('a token refresh that returns no access token is a clear error, not "Bearer undefined"', () => {
+    const auth = oauthMock({ cached: false, refreshedAccessToken: '' })
+    const { engine, msg } = loadEngine({ sn_auth: auth })
+    const r = engine.execute({ source: 'url', endpoint: 'https://x', authType: 'oauth', authProfile: 'oap1' })
+    assert.equal(r.ok, false)
+    assert.match(r.error, /no access token/)
+    assert.equal(msg.first('execute'), undefined, 'must not send the request')
+})
+
+test('oauth without a profile fails instead of firing "Bearer undefined"', () => {
+    const { engine, msg } = loadEngine({ sn_auth: oauthMock() })
+    const r = engine.execute({ source: 'url', endpoint: 'https://x', authType: 'oauth' })
+    assert.equal(r.ok, false)
+    assert.match(r.error, /no OAuth Entity Profile/)
+    assert.equal(msg.first('execute'), undefined, 'must not send the request')
+})
+
+// --- MID routing -----------------------------------------------------------
+
+test('a MID server routes asynchronously (executeAsync + waitForResponse + setMIDServer)', () => {
+    const { engine, msg } = loadEngine()
+    const r = engine.execute({ source: 'url', endpoint: 'https://x', midServer: 'MID01' })
+    assert.equal(r.ok, true)
+    assert.deepEqual(msg.first('setMIDServer').args, ['MID01'])
+    assert.ok(msg.first('executeAsync'), 'MID-routed calls are async')
+    assert.ok(msg.first('waitForResponse'))
+    assert.equal(msg.first('execute'), undefined)
+})
+
+test('MID timeout defaults to 60 and accepts a user-supplied number of seconds', () => {
+    let h = loadEngine()
+    h.engine.execute({ source: 'url', endpoint: 'https://x', midServer: 'M' })
+    assert.deepEqual(h.msg.first('waitForResponse').args, [60])
+
+    h = loadEngine()
+    h.engine.execute({ source: 'url', endpoint: 'https://x', midServer: 'M', timeout: '120' })
+    assert.deepEqual(h.msg.first('waitForResponse').args, [120])
+
+    // Garbage falls back to the default rather than waiting 0/NaN seconds.
+    h = loadEngine()
+    h.engine.execute({ source: 'url', endpoint: 'https://x', midServer: 'M', timeout: 'soon' })
+    assert.deepEqual(h.msg.first('waitForResponse').args, [60])
+})
+
+// --- Variables + normalization --------------------------------------------
+
+test('url mode: variables with no matching ${token} become query parameters', () => {
+    const { engine, msg } = loadEngine()
+    engine.execute({ source: 'url', endpoint: 'https://x', variables: { max_length: '140', limit: '5' } })
+    const q = Object.fromEntries(msg.all('setQueryParameter').map((c) => c.args))
+    assert.deepEqual(q, { max_length: '140', limit: '5' })
+    assert.equal(msg.all('setStringParameterNoEscape').length, 0, 'not substituted when no token present')
+})
+
+test('url mode: a variable matching a ${token} substitutes and is not also duplicated on the query string', () => {
+    const { engine, msg } = loadEngine()
+    engine.execute({ source: 'url', endpoint: 'https://x?max_length=${max_length}', variables: { max_length: '140' } })
+    assert.deepEqual(msg.first('setStringParameterNoEscape').args, ['max_length', '140'])
+    assert.equal(msg.all('setQueryParameter').length, 0)
+})
+
+test('url mode: a ${token} in the request BODY substitutes instead of appending a query param', () => {
+    const { engine, msg } = loadEngine()
+    engine.execute({ source: 'url', endpoint: 'https://x', httpMethod: 'post', body: '{"who":"${name}"}', variables: { name: 'joe' } })
+    assert.deepEqual(msg.first('setStringParameterNoEscape').args, ['name', 'joe'])
+    assert.equal(msg.all('setQueryParameter').length, 0)
+})
+
+test('rest-message mode: variables substitute and are never appended as query params', () => {
+    const { engine, msg } = loadEngine({ tables: catFactsTables() })
+    engine.execute({ source: 'restMessage', restMessage: 'Cat Facts', method: 'Get Random Fact', variables: { max_length: '140' } })
+    assert.deepEqual(msg.first('setStringParameterNoEscape').args, ['max_length', '140'])
+    assert.equal(msg.all('setQueryParameter').length, 0)
+})
+
+test('a response with haveError() is normalized to ok:false with an error code', () => {
+    const response = makeResponse({ error: true, status: 500, errorCode: '500', errorMessage: 'boom' })
+    const { engine } = loadEngine({ response })
+    const r = engine.execute({ source: 'url', endpoint: 'https://x' })
+    assert.equal(r.ok, false)
+    assert.equal(r.status, 500)
+    assert.equal(r.error, '500: boom')
+})
+
+test('response headers fall back to getAllHeaders() when getHeaders() yields nothing', () => {
+    // On the instance getHeaders() is a wrapped Java map that may not enumerate;
+    // the engine then rebuilds the map from the getAllHeaders() list.
+    const response = makeResponse({ body: 'ok' })
+    response.getHeaders = () => ({})
+    response.getAllHeaders = () => [{ getName: () => 'Content-Type', getValue: () => 'text/plain' }]
+    const { engine } = loadEngine({ response })
+    const r = engine.execute({ source: 'url', endpoint: 'https://x' })
+    assert.deepEqual({ ...r.headers }, { 'Content-Type': 'text/plain' })
+})
+
+// --- Stored auth resolution (UI preselect) ---------------------------------
+// _mapStoredAuth maps a function's configured auth to the widget model so the UI
+// can preselect the auth dropdown. It reads only .getValue() off two records, so
+// a plain stub stands in for a GlideRecord.
+
+/** Minimal GlideRecord stand-in for _mapStoredAuth (getValue only). */
+function rec(vals) {
+    return { getValue: (f) => (vals[f] != null ? vals[f] : '') }
+}
+
+test('stored auth: function basic with a profile preselects the profile picker', () => {
+    const { engine } = loadEngine()
+    const auth = engine._mapStoredAuth(
+        rec({ authentication_type: 'no_authentication' }),
+        rec({ authentication_type: 'basic', basic_auth_profile: 'bp1', basic_auth_user: 'joe' }),
+    )
+    assert.deepEqual({ ...auth }, { type: 'basic', mode: 'profile', profile: 'bp1', username: 'joe' })
+})
+
+test('stored auth: function basic without a profile falls back to manual + username', () => {
+    const { engine } = loadEngine()
+    const auth = engine._mapStoredAuth(
+        rec({}),
+        rec({ authentication_type: 'basic', basic_auth_user: 'joe' }),
+    )
+    assert.deepEqual({ ...auth }, { type: 'basic', mode: 'manual', profile: '', username: 'joe' })
+})
+
+test('stored auth: basic_simple maps to the basic model', () => {
+    const { engine } = loadEngine()
+    const auth = engine._mapStoredAuth(
+        rec({}),
+        rec({ authentication_type: 'basic_simple', basic_auth_profile: 'bp2' }),
+    )
+    assert.equal(auth.type, 'basic')
+    assert.equal(auth.profile, 'bp2')
+})
+
+test('stored auth: function oauth2 preselects the OAuth profile', () => {
+    const { engine } = loadEngine()
+    const auth = engine._mapStoredAuth(
+        rec({}),
+        rec({ authentication_type: 'oauth2', oauth2_profile: 'op1' }),
+    )
+    assert.deepEqual({ ...auth }, { type: 'oauth', mode: 'profile', profile: 'op1', username: '' })
+})
+
+test('stored auth: no_authentication yields no preselection', () => {
+    const { engine } = loadEngine()
+    const auth = engine._mapStoredAuth(rec({}), rec({ authentication_type: 'no_authentication' }))
+    assert.deepEqual({ ...auth }, { type: 'none', mode: 'profile', profile: '', username: '' })
+})
+
+test('stored auth: inherit_from_parent uses the parent type AND the parent profile', () => {
+    const { engine } = loadEngine()
+    const auth = engine._mapStoredAuth(
+        rec({ authentication_type: 'oauth2', oauth2_profile: 'parentOauth' }),
+        rec({ authentication_type: 'inherit_from_parent', oauth2_profile: 'ignoredChild' }),
+    )
+    assert.deepEqual({ ...auth }, { type: 'oauth', mode: 'profile', profile: 'parentOauth', username: '' })
+})
+
+test('stored auth: an unset function type is treated as inherit (falls back to parent)', () => {
+    const { engine } = loadEngine()
+    const auth = engine._mapStoredAuth(
+        rec({ authentication_type: 'basic', basic_auth_profile: 'parentBasic' }),
+        rec({}),
+    )
+    assert.deepEqual({ ...auth }, { type: 'basic', mode: 'profile', profile: 'parentBasic', username: '' })
+})
+
+test('stored auth: mutual auth / unrecognized types get no preselection', () => {
+    const { engine } = loadEngine()
+    const auth = engine._mapStoredAuth(rec({}), rec({ authentication_type: 'mutual_auth' }))
+    assert.equal(auth.type, 'none')
+})

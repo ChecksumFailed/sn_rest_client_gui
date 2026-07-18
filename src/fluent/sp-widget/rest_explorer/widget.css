@@ -1,0 +1,39 @@
+.rest-explorer .re-title {
+  margin-top: 0;
+  margin-bottom: 16px;
+}
+
+.rest-explorer .re-code {
+  font-family: Menlo, Monaco, Consolas, "Courier New", monospace;
+  font-size: 12px;
+  white-space: pre;
+  overflow-x: auto;
+}
+
+.rest-explorer pre.re-code {
+  max-height: 420px;
+  overflow: auto;
+}
+
+.rest-explorer .re-kv {
+  display: flex;
+  gap: 6px;
+  margin-bottom: 6px;
+}
+
+.rest-explorer .re-kv input {
+  flex: 1 1 auto;
+}
+
+.rest-explorer .re-kv .btn {
+  flex: 0 0 auto;
+}
+
+.rest-explorer .re-err {
+  color: #a94442;
+  margin-left: 8px;
+}
+
+.rest-explorer .panel-heading .re-err {
+  font-weight: normal;
+}
