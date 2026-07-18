@@ -13,6 +13,10 @@ MID Server** by fetching the token in script and injecting it as a manual `Autho
 |---|---|---|
 | ![Default view of the Outbound REST Console](screenshots/rest-explorer-default.png) | ![Direct URL mode with query params parsed out of a pasted URL](screenshots/rest-explorer-direct-url.png) | ![OAuth 2.0 authentication type selected, showing the entity profile picker](screenshots/rest-explorer-oauth.png) |
 
+| A real response | Basic auth (live) | API key (live) |
+|---|---|---|
+| ![Response panel showing a 200 from catfact.ninja, with request URL, response headers, and pretty-printed body](screenshots/rest-explorer-response.png) | ![Basic auth, manual entry, against httpbingo.org/basic-auth returning authenticated: true](screenshots/rest-explorer-basic-auth.png) | ![API key sent as a query param against api.nasa.gov's APOD endpoint with the public DEMO_KEY](screenshots/rest-explorer-apikey.png) |
+
 ## Components
 
 Built as a **now-sdk (ServiceNow Fluent) scoped application** — scope `x_1676196_rest_gui`. Each Fluent
@@ -89,17 +93,21 @@ so the tests run.
 Deployed to a dev instance; the no-auth path (both a saved REST Message and a direct URL) has been
 exercised end to end. The engine logic is covered by `npm test`, but these still need live confirmation:
 
-1. `RestExplorerEngine.execute(config)` against a real endpoint for the **Basic**, **API key**, and
-   **OAuth** auth types (the unit suite mocks the transport; it does not prove a real credential works).
-   Free public endpoints for each auth type are catalogued in [docs/free-test-apis.md](docs/free-test-apis.md).
+1. `RestExplorerEngine.execute(config)` against a real endpoint for **Basic** and **API key**
+   (query-param placement) is now confirmed live — see the screenshots above (`httpbingo.org/basic-auth`
+   returning `authenticated: true`, and `api.nasa.gov`'s APOD endpoint returning `200`). Still open:
+   header-placement API keys, and the **OAuth** auth type (the unit suite mocks the transport; it does
+   not prove a real credential works). Free public endpoints for each auth type are catalogued in
+   [docs/free-test-apis.md](docs/free-test-apis.md).
 2. **The OAuth-through-MID path** — a manual Bearer header + `setAuthenticationProfile('no_authentication')`
    against a MID-routed internal endpoint. This uses an *undocumented* auth value and is the one
    load-bearing, unverified call.
 3. The field names this code assumes but the docs don't confirm:
    `sys_rest_message_fn.function_name` / `.http_method` / `.rest_endpoint` / `.rest_message`,
    `sys_auth_profile_basic`, and `ecc_agent.status=Up` for the MID-server list.
-4. The widget in Service Portal: dropdowns populate, Send does not reload the page, and the response
-   body pretty-prints JSON (other content types render as raw text).
-5. Response headers actually populate in the response panel — `getHeaders()` returns a wrapped Java
-   map on the instance; the engine falls back to `getAllHeaders()` if the map doesn't enumerate,
-   but neither path has been confirmed live.
+4. ~~The widget in Service Portal: dropdowns populate, Send does not reload the page, and the response
+   body pretty-prints JSON~~ — confirmed live (see screenshots above). Other content types rendering as
+   raw text is still unverified (only JSON responses have been exercised so far).
+5. ~~Response headers actually populate in the response panel~~ — confirmed live; `getHeaders()`
+   enumerates correctly on this instance (see screenshots above), so the `getAllHeaders()` fallback
+   path remains unexercised.
