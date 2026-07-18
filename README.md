@@ -21,6 +21,11 @@ MID Server** by fetching the token in script and injecting it as a manual `Autho
 |---|---|---|
 | ![API key sent as a header against postman-echo.com/headers, echoed back with the correct name and value](screenshots/rest-explorer-apikey-header.png) | ![REST Message mode: the Cat Facts message's "Get a list of breeds" method, with the \${limit} variable pre-filled from its stored test value and substituted into the sent URL](screenshots/rest-explorer-rest-message.png) | ![Direct URL call routed through the mid01 MID Server, showing the async-routing hint and a real 200 response](screenshots/rest-explorer-mid-server.png) |
 
+**OAuth 2.0, live** — GitHub's `authorization_code` profile, reusing the token minted by a prior
+interactive consent (see [docs/free-test-apis.md](docs/free-test-apis.md)) to call `/gists`:
+
+![OAuth 2.0 against GitHub's real API, reusing a stored token to return the authenticated user's gists](screenshots/rest-explorer-oauth-live.png)
+
 ## Components
 
 Built as a **now-sdk (ServiceNow Fluent) scoped application** — scope `x_1676196_rest_gui`. Each Fluent
@@ -97,19 +102,20 @@ so the tests run.
 Deployed to a dev instance; the no-auth path (both a saved REST Message and a direct URL) has been
 exercised end to end. The engine logic is covered by `npm test`, but these still need live confirmation:
 
-1. `RestExplorerEngine.execute(config)` against a real endpoint for **Basic** and **API key** (both
-   query-param and header placement) is now confirmed live — see the screenshots above
-   (`httpbingo.org/basic-auth` returning `authenticated: true`, `api.nasa.gov`'s APOD endpoint
-   returning `200`, and `postman-echo.com/headers` echoing back a correctly-named/valued header).
-   Still open: the **OAuth** auth type (the unit suite mocks the transport; it does not prove a real
-   credential works) and a stored **Basic Auth profile** (only manual-entry Basic has been exercised
-   live so far). Free public endpoints for each auth type are catalogued in
+1. ~~`RestExplorerEngine.execute(config)` against a real endpoint for **Basic**, **API key**, and
+   **OAuth**~~ — all three confirmed live: see the screenshots above (`httpbingo.org/basic-auth`
+   returning `authenticated: true`; `api.nasa.gov`'s APOD endpoint and `postman-echo.com/headers`
+   for query-param and header API keys; GitHub's `/gists` via the `Github API default_profile` OAuth
+   Entity Profile, reusing a token from a prior interactive consent). Still open: a stored **Basic
+   Auth profile** (only manual-entry Basic has been exercised live) and headless OAuth token minting
+   (`client_credentials` — the GitHub profile only proved the stored-token-reuse branch, since GitHub
+   supports only `authorization_code`). Free public endpoints for each auth type are catalogued in
    [docs/free-test-apis.md](docs/free-test-apis.md).
 2. **The OAuth-through-MID path** — a manual Bearer header + `setAuthenticationProfile('no_authentication')`
    against a MID-routed internal endpoint. This uses an *undocumented* auth value and is the one
    load-bearing, unverified call. (MID-routing itself — `executeAsync()` + `waitForResponse()` against
-   `mid01` — is now confirmed live, see the MID Server screenshot above; it's specifically the
-   OAuth-through-MID combination that remains unverified.)
+   `mid01` — and OAuth 2.0 itself are each now confirmed live independently, see the screenshots above;
+   it's specifically the *combination* of the two that remains unverified.)
 3. ~~`ecc_agent.status=Up` for the MID-server list~~ and ~~`sys_rest_message_fn.function_name` /
    `.http_method` / `.rest_endpoint` / `.rest_message`~~ — both confirmed live (the MID Server and
    REST Message screenshots above). `sys_auth_profile_basic` is still unconfirmed — see point 1.

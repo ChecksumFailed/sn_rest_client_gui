@@ -127,7 +127,18 @@ await page.waitForTimeout(500);
 await send();
 await shot('rest-explorer-rest-message.png');
 
-// 9. MID-server-routed call (async executeAsync()/waitForResponse() path).
+// 9. Live OAuth 2.0: GitHub's authorization_code profile, reusing the token minted by a prior
+// interactive "Get OAuth Token" consent (GitHub only supports authorization_code, so this exercises
+// the stored-token-reuse path in _requestorCandidates rather than a headless client_credentials mint).
+await freshLoad();
+await useDirectUrl('https://api.github.com/gists');
+await page.selectOption(authTypeSelect, 'oauth');
+await page.waitForTimeout(300);
+await page.selectOption('select[ng-model="c.req.authProfile"]', { label: 'Github API default_profile' });
+await send();
+await shot('rest-explorer-oauth-live.png');
+
+// 10. MID-server-routed call (async executeAsync()/waitForResponse() path).
 await freshLoad();
 await useDirectUrl('https://catfact.ninja/breeds?limit=5');
 await page.selectOption(midServerSelect, { label: 'mid01' });
