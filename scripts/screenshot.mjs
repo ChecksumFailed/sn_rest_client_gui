@@ -107,5 +107,37 @@ await page.fill('input[ng-model="c.req.apiKey.value"]', 'DEMO_KEY');
 await send();
 await shot('rest-explorer-apikey.png');
 
+// 7. API key (header placement) against postman-echo.com/headers, which echoes the header back.
+await freshLoad();
+await useDirectUrl('https://postman-echo.com/headers');
+await page.selectOption(authTypeSelect, 'apikey');
+await page.selectOption('select[ng-model="c.req.apiKey.placement"]', 'header');
+await page.fill('input[ng-model="c.req.apiKey.name"]', 'X-API-Key');
+await page.fill('input[ng-model="c.req.apiKey.value"]', 'demo-header-key');
+await send();
+await shot('rest-explorer-apikey-header.png');
+
+// 8. REST Message mode: a real saved message/method, showing ${token} variable substitution
+// pre-filled from the function's stored test value, then sent for a real response.
+await freshLoad();
+await page.selectOption('select[ng-model="c.req.restMessage"]', { label: 'Cat Facts' });
+await page.waitForTimeout(500);
+await page.selectOption('select[ng-model="c.req.method"]', { label: 'Get a list of breeds  (https://catfact.ninja/breeds?limit=${limit})' });
+await page.waitForTimeout(500);
+await send();
+await shot('rest-explorer-rest-message.png');
+
+// 9. MID-server-routed call (async executeAsync()/waitForResponse() path).
+await freshLoad();
+await useDirectUrl('https://catfact.ninja/breeds?limit=5');
+await page.selectOption(midServerSelect, { label: 'mid01' });
+await page.click(sendButton);
+await page.waitForFunction(() => {
+  const el = document.querySelector('.panel-heading');
+  return el && !el.textContent.includes('—');
+}, { timeout: 30000 });
+await page.waitForTimeout(300);
+await shot('rest-explorer-mid-server.png');
+
 await browser.close();
 console.log('Done.');
