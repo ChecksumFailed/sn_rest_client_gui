@@ -7,6 +7,25 @@ MID Server** by fetching the token in script and injecting it as a manual `Autho
 
 > This tool executes existing REST Messages. It does **not** create or modify REST Message records.
 
+## Screenshots
+
+| Default view | Direct URL mode | OAuth 2.0 auth |
+|---|---|---|
+| ![Default view of the Outbound REST Console](screenshots/rest-explorer-default.png) | ![Direct URL mode with query params parsed out of a pasted URL](screenshots/rest-explorer-direct-url.png) | ![OAuth 2.0 authentication type selected, showing the entity profile picker](screenshots/rest-explorer-oauth.png) |
+
+| A real response | Basic auth (live) | API key, query param (live) |
+|---|---|---|
+| ![Response panel showing a 200 from catfact.ninja, with request URL, response headers, and pretty-printed body](screenshots/rest-explorer-response.png) | ![Basic auth, manual entry, against httpbingo.org/basic-auth returning authenticated: true](screenshots/rest-explorer-basic-auth.png) | ![API key sent as a query param against api.nasa.gov's APOD endpoint with the public DEMO_KEY](screenshots/rest-explorer-apikey.png) |
+
+| API key, header (live) | REST Message mode (live) | MID Server routing (live) |
+|---|---|---|
+| ![API key sent as a header against postman-echo.com/headers, echoed back with the correct name and value](screenshots/rest-explorer-apikey-header.png) | ![REST Message mode: the Cat Facts message's "Get a list of breeds" method, with the \${limit} variable pre-filled from its stored test value and substituted into the sent URL](screenshots/rest-explorer-rest-message.png) | ![Direct URL call routed through the mid01 MID Server, showing the async-routing hint and a real 200 response](screenshots/rest-explorer-mid-server.png) |
+
+**OAuth 2.0, live** — GitHub's `authorization_code` profile, reusing the token minted by a prior
+interactive consent (see [docs/free-test-apis.md](docs/free-test-apis.md)) to call `/gists`:
+
+![OAuth 2.0 against GitHub's real API, reusing a stored token to return the authenticated user's gists](screenshots/rest-explorer-oauth-live.png)
+
 ## Components
 
 Built as a **now-sdk (ServiceNow Fluent) scoped application** — scope `x_1676196_rest_gui`. Each Fluent
@@ -83,17 +102,26 @@ so the tests run.
 Deployed to a dev instance; the no-auth path (both a saved REST Message and a direct URL) has been
 exercised end to end. The engine logic is covered by `npm test`, but these still need live confirmation:
 
-1. `RestExplorerEngine.execute(config)` against a real endpoint for the **Basic**, **API key**, and
-   **OAuth** auth types (the unit suite mocks the transport; it does not prove a real credential works).
-   Free public endpoints for each auth type are catalogued in [docs/free-test-apis.md](docs/free-test-apis.md).
+1. ~~`RestExplorerEngine.execute(config)` against a real endpoint for **Basic**, **API key**, and
+   **OAuth**~~ — all three confirmed live: see the screenshots above (`httpbingo.org/basic-auth`
+   returning `authenticated: true`; `api.nasa.gov`'s APOD endpoint and `postman-echo.com/headers`
+   for query-param and header API keys; GitHub's `/gists` via the `Github API default_profile` OAuth
+   Entity Profile, reusing a token from a prior interactive consent). Still open: a stored **Basic
+   Auth profile** (only manual-entry Basic has been exercised live) and headless OAuth token minting
+   (`client_credentials` — the GitHub profile only proved the stored-token-reuse branch, since GitHub
+   supports only `authorization_code`). Free public endpoints for each auth type are catalogued in
+   [docs/free-test-apis.md](docs/free-test-apis.md).
 2. **The OAuth-through-MID path** — a manual Bearer header + `setAuthenticationProfile('no_authentication')`
    against a MID-routed internal endpoint. This uses an *undocumented* auth value and is the one
-   load-bearing, unverified call.
-3. The field names this code assumes but the docs don't confirm:
-   `sys_rest_message_fn.function_name` / `.http_method` / `.rest_endpoint` / `.rest_message`,
-   `sys_auth_profile_basic`, and `ecc_agent.status=Up` for the MID-server list.
-4. The widget in Service Portal: dropdowns populate, Send does not reload the page, and the response
-   body pretty-prints JSON (other content types render as raw text).
-5. Response headers actually populate in the response panel — `getHeaders()` returns a wrapped Java
-   map on the instance; the engine falls back to `getAllHeaders()` if the map doesn't enumerate,
-   but neither path has been confirmed live.
+   load-bearing, unverified call. (MID-routing itself — `executeAsync()` + `waitForResponse()` against
+   `mid01` — and OAuth 2.0 itself are each now confirmed live independently, see the screenshots above;
+   it's specifically the *combination* of the two that remains unverified.)
+3. ~~`ecc_agent.status=Up` for the MID-server list~~ and ~~`sys_rest_message_fn.function_name` /
+   `.http_method` / `.rest_endpoint` / `.rest_message`~~ — both confirmed live (the MID Server and
+   REST Message screenshots above). `sys_auth_profile_basic` is still unconfirmed — see point 1.
+4. ~~The widget in Service Portal: dropdowns populate, Send does not reload the page, and the response
+   body pretty-prints JSON~~ — confirmed live (see screenshots above). Other content types rendering as
+   raw text is still unverified (only JSON responses have been exercised so far).
+5. ~~Response headers actually populate in the response panel~~ — confirmed live; `getHeaders()`
+   enumerates correctly on this instance (see screenshots above), so the `getAllHeaders()` fallback
+   path remains unexercised.

@@ -84,17 +84,14 @@
         fn.orderBy('function_name');
         fn.query();
         while (fn.next()) {
+            // Same fallback as _resolveFunction: a function may inherit the
+            // parent message's endpoint.
+            var endpoint = fn.getValue('rest_endpoint') || parent.getValue('rest_endpoint');
             methods.push({
-                // Just the function name: the response panel shows the actual sent URL.
-                label: fn.getValue('function_name'),
+                label: fn.getValue('function_name') + '  (' + endpoint + ')',
                 value: fn.getValue('function_name'),
                 httpMethod: fn.getValue('http_method'),
-                // Same fallback as _resolveFunction: a function may inherit the
-                // parent message's endpoint.
-                endpoint: fn.getValue('rest_endpoint') || parent.getValue('rest_endpoint'),
-                // Defined HTTP query parameters (param_defs), in order -- the client's
-                // preview appends them the same way _applyFunctionDefaults will.
-                queryParams: engine._readFnChildValues('sys_rest_message_fn_param_defs', fn.getUniqueValue()),
+                endpoint: endpoint,
                 // Stored auth, resolved through inherit_from_parent, so the client can
                 // preselect the auth dropdown + profile when this method is chosen.
                 auth: engine._mapStoredAuth(parent, fn)
