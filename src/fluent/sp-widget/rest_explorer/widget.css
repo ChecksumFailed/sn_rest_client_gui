@@ -29,11 +29,23 @@
   flex: 0 0 auto;
 }
 
-.rest-explorer .re-err {
-  color: #a94442;
-  margin-left: 8px;
+.rest-explorer .re-oauth-hint {
+  display: inline-block;
+  margin: 0 0 0 8px;
+  vertical-align: middle;
 }
 
-.rest-explorer .panel-heading .re-err {
-  font-weight: normal;
+/* Explicit background + text color: portal themes restyle .panel-danger, and the
+   old approach (dark red text directly on the heading) was unreadable on themes
+   with a red heading background. Errors carry provider response bodies now, so
+   the block wraps and breaks long tokens/URLs. */
+.rest-explorer .re-error-block {
+  background: #fff;
+  color: #a94442;
+  border: 1px solid #a94442;
+  border-radius: 4px;
+  padding: 8px 12px;
+  margin-bottom: 12px;
+  white-space: pre-wrap;
+  word-break: break-word;
 }

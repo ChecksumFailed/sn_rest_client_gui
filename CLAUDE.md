@@ -51,7 +51,7 @@ Two authoring patterns exist in the wild (both seen live on real records), and t
 
 More `fn_parameters` details (from live records): its list columns are Name / **Escape type** / **Test value**, and the test-value column's element is **`value`** (confirmed live). The engine always substitutes with `setStringParameterNoEscape`, ignoring `escape_type` — fine for a console where the user sees the raw result, but revisit if faithful escaping ever matters.
 
-**Still unverified on an instance:** `sys_rest_message_fn.function_name` / `.http_method` / `.rest_endpoint` / `.rest_message`, `sys_auth_profile_basic`, `ecc_agent.status=Up` for MID servers, and `sn_auth.OAuthMidSelector` (undocumented; wrapped in try/catch).
+**Still unverified on an instance:** `sys_rest_message_fn.function_name` / `.http_method` / `.rest_endpoint` / `.rest_message`, `sys_auth_profile_basic`, `ecc_agent.status=Up` for MID servers, and `sn_auth.OAuthMidSelector` (undocumented; wrapped in try/catch). Also `oauth_requestor_profile` and its `oauth_entity_profile` / `oauth_requestor` columns, used by `_requestorCandidates` to find stored OAuth tokens (the requestor/context columns are documented in `platform-security/authentication/generate-initial-token.md`, the entity-profile reference column name is inferred; the code re-checks the column value per row and fails soft, contributing no candidates, if the schema differs or ACLs hide the table).
 
 ## What this project is
 

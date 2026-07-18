@@ -13,6 +13,22 @@ declare global {
                         table: 'sys_scope_privilege'
                         id: '0edc665393868310e4bb7ee32bba10fb'
                     }
+                    '241fb21f930a8310e4bb7ee32bba1020': {
+                        table: 'sys_kmf_crypto_caller_policy'
+                        id: '241fb21f930a8310e4bb7ee32bba1020'
+                    }
+                    '2ad4035b934a8310e4bb7ee32bba1097': {
+                        table: 'sys_scope_privilege'
+                        id: '2ad4035b934a8310e4bb7ee32bba1097'
+                    }
+                    '2ad4cf1b934a8310e4bb7ee32bba1071': {
+                        table: 'sys_scope_privilege'
+                        id: '2ad4cf1b934a8310e4bb7ee32bba1071'
+                    }
+                    '2ed4035b934a8310e4bb7ee32bba1093': {
+                        table: 'sys_scope_privilege'
+                        id: '2ed4035b934a8310e4bb7ee32bba1093'
+                    }
                     '35dc225393868310e4bb7ee32bba107b': {
                         table: 'sys_scope_privilege'
                         id: '35dc225393868310e4bb7ee32bba107b'
@@ -32,6 +48,40 @@ declare global {
                     '3b9caa1393868310e4bb7ee32bba10db': {
                         table: 'sys_scope_privilege'
                         id: '3b9caa1393868310e4bb7ee32bba10db'
+                    }
+                    '3e284f13938a8310e4bb7ee32bba10e8': {
+                        table: 'sys_scope_privilege'
+                        id: '3e284f13938a8310e4bb7ee32bba10e8'
+                    }
+                    '581f721f930a8310e4bb7ee32bba10a8': {
+                        table: 'oauth_entity_profile'
+                        id: '581f721f930a8310e4bb7ee32bba10a8'
+                        deleted: true
+                    }
+                    '6a434b57934a8310e4bb7ee32bba1094': {
+                        table: 'sys_scope_privilege'
+                        id: '6a434b57934a8310e4bb7ee32bba1094'
+                    }
+                    '72288f13938a8310e4bb7ee32bba10b5': {
+                        table: 'sys_scope_privilege'
+                        id: '72288f13938a8310e4bb7ee32bba10b5'
+                    }
+                    '72434b57934a8310e4bb7ee32bba10ad': {
+                        table: 'sys_scope_privilege'
+                        id: '72434b57934a8310e4bb7ee32bba10ad'
+                    }
+                    '76434b57934a8310e4bb7ee32bba10a9': {
+                        table: 'sys_scope_privilege'
+                        id: '76434b57934a8310e4bb7ee32bba10a9'
+                    }
+                    '7ceefadb930a8310e4bb7ee32bba1063': {
+                        table: 'oauth_entity'
+                        id: '7ceefadb930a8310e4bb7ee32bba1063'
+                        deleted: true
+                    }
+                    '7e288f13938a8310e4bb7ee32bba10b8': {
+                        table: 'sys_scope_privilege'
+                        id: '7e288f13938a8310e4bb7ee32bba10b8'
                     }
                     '7fb92882224d4e45b08ff5e2d1ce96bb': {
                         table: 'sp_container'
@@ -101,6 +151,11 @@ declare global {
                         table: 'sys_scope_privilege'
                         id: 'cfd1b6df93868310e4bb7ee32bba10a1'
                     }
+                    d42f361f930a8310e4bb7ee32bba10e1: {
+                        table: 'sys_alias'
+                        id: 'd42f361f930a8310e4bb7ee32bba10e1'
+                        deleted: true
+                    }
                     'default-mid-server': {
                         table: 'sys_properties'
                         id: 'dc58cfc59b0b4a309d0b8136de1806e2'
@@ -109,9 +164,25 @@ declare global {
                         table: 'sys_scope_privilege'
                         id: 'dfbc225393868310e4bb7ee32bba1070'
                     }
+                    e2434b57934a8310e4bb7ee32bba109a: {
+                        table: 'sys_scope_privilege'
+                        id: 'e2434b57934a8310e4bb7ee32bba109a'
+                    }
+                    e6434b57934a8310e4bb7ee32bba10a5: {
+                        table: 'sys_scope_privilege'
+                        id: 'e6434b57934a8310e4bb7ee32bba10a5'
+                    }
+                    ea434b57934a8310e4bb7ee32bba10a1: {
+                        table: 'sys_scope_privilege'
+                        id: 'ea434b57934a8310e4bb7ee32bba10a1'
+                    }
                     ea9c221f93468310e4bb7ee32bba108d: {
                         table: 'sys_scope_privilege'
                         id: 'ea9c221f93468310e4bb7ee32bba108d'
+                    }
+                    ee434b57934a8310e4bb7ee32bba109d: {
+                        table: 'sys_scope_privilege'
+                        id: 'ee434b57934a8310e4bb7ee32bba109d'
                     }
                     f28c261393868310e4bb7ee32bba105b: {
                         table: 'sys_scope_privilege'

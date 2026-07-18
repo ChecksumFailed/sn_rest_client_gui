@@ -7,6 +7,10 @@
   <div ng-if="data.canRun">
     <h3 class="re-title">Outbound REST Console</h3>
 
+    <!-- On large screens the response sits to the right of the builder; below the
+         lg breakpoint both stack, response underneath, as before. -->
+    <div class="row">
+    <div ng-class="c.resp ? 'col-lg-6' : 'col-lg-12'">
     <!-- Request builder -->
     <div class="panel panel-default">
       <div class="panel-body">
@@ -107,6 +111,16 @@
               <label>Requestor ID <small>(optional)</small></label>
               <input class="form-control" ng-model="c.req.requestorId" placeholder="sys_id">
             </div>
+            <div class="col-sm-12" style="padding-left:0">
+              <button class="btn btn-default btn-sm" ng-click="c.getOAuthToken()"
+                      ng-disabled="!c.req.authProfile">
+                Get OAuth Token
+              </button>
+              <span class="help-block re-oauth-hint">
+                For authorization-code profiles: opens the provider's login in a popup.
+                When it finishes, Send — the console reuses the stored token.
+              </span>
+            </div>
           </div>
 
           <div class="col-sm-8" ng-if="c.req.authType === 'apikey'">
@@ -188,18 +202,23 @@
       </div>
     </div>
 
+    </div>
+
     <!-- Response -->
-    <div class="panel" ng-class="c.resp.ok ? 'panel-success' : 'panel-danger'" ng-if="c.resp">
+    <div class="col-lg-6" ng-if="c.resp">
+    <div class="panel" ng-class="c.resp.ok ? 'panel-success' : 'panel-danger'">
       <div class="panel-heading">
         <strong>Status:</strong> {{c.resp.status || '—'}}
-        <span ng-if="c.resp.error" class="re-err">{{c.resp.error}}</span>
       </div>
       <div class="panel-body">
+        <div ng-if="c.resp.error" class="re-error-block">{{c.resp.error}}</div>
         <label>Response Headers</label>
         <pre class="re-code">{{c.resp.headers | json}}</pre>
         <label>Response Body</label>
         <pre class="re-code">{{c.prettyBody}}</pre>
       </div>
+    </div>
+    </div>
     </div>
   </div>
 </div>

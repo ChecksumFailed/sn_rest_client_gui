@@ -91,7 +91,7 @@ RestExplorerEngine.prototype = {
         // --- Authentication -------------------------------------------------
         // Any failure here is returned to the caller; we never fire the request
         // with a half-applied or missing credential.
-        var authError = this._applyAuth(sm, config, useMid, built.endpoint);
+        var authError = this._applyAuth(sm, config, useMid, built.endpoint, built.messageSysId);
         if (authError) {
             return this._fail(authError);
         }
@@ -123,7 +123,7 @@ RestExplorerEngine.prototype = {
      * Apply authentication to the message. Returns an error string on failure,
      * or null/undefined on success.
      */
-    _applyAuth: function(sm, config, useMid, endpoint) {
+    _applyAuth: function(sm, config, useMid, endpoint, messageSysId) {
         switch (config.authType) {
 
             case 'basic':
@@ -166,7 +166,7 @@ RestExplorerEngine.prototype = {
                 // as a literal Bearer header, and set the profile to no_authentication so
                 // the platform does not re-authenticate over the manual header. This is the
                 // only path that works when routing an OAuth-secured call through a MID server.
-                var token = this._getAccessToken(config, useMid);
+                var token = this._getAccessToken(config, useMid, messageSysId);
                 if (token.error) {
                     return token.error;
                 }
@@ -191,39 +191,177 @@ RestExplorerEngine.prototype = {
     /**
      * Fetch an OAuth access token, refreshing through the MID server when the call
      * is MID-routed (the token endpoint is usually behind the same firewall).
+     *
+     * Stored tokens are keyed by (requestor, profile), and different platform flows
+     * store them under different requestors: "Get OAuth Token" on a REST message uses
+     * the message record, the credential page uses the credential record. So this
+     * searches all plausible requestors before minting -- an authorization-code
+     * profile (e.g. GitHub) CANNOT mint headlessly and reuse is the only option.
      * Returns { value } on success or { error } on failure -- never a silent undefined.
      */
-    _getAccessToken: function(config, useMid) {
+    _getAccessToken: function(config, useMid, messageSysId) {
         if (!config.authProfile) {
             return { error: 'OAuth selected but no OAuth Entity Profile was chosen.' };
         }
         try {
             var oAuthClient = new sn_auth.GlideOAuthClient();
 
-            // getToken returns the cached token for this requestor/profile pair, if any.
-            var token = oAuthClient.getToken(config.requestorId || '', config.authProfile);
-
-            if (!token || token.getExpiresIn() < this.TOKEN_MIN_TTL) {
-                var tokenRequest = new sn_auth.GlideOAuthClientRequest();
-                tokenRequest.setParameter('oauth_requestor_context', 'rest');
-                if (config.requestorId) {
-                    tokenRequest.setParameter('oauth_requestor', config.requestorId);
-                }
-                tokenRequest.setParameter('oauth_provider_profile', config.authProfile);
-                if (useMid) {
-                    tokenRequest.setMIDServer(config.midServer);
-                }
-                var tokenResponse = oAuthClient.requestTokenByRequest(null, tokenRequest);
-                token = tokenResponse ? tokenResponse.getToken() : null;
+            var found = this._findStoredToken(oAuthClient, config, messageSysId);
+            if (found.fresh) {
+                return { value: found.fresh.getAccessToken() };
             }
 
-            if (!token || !token.getAccessToken()) {
-                return { error: 'OAuth token request returned no access token. Check the OAuth profile and (for MID routing) the MID server.' };
+            // No fresh stored token: try to mint (or refresh) one. Target the requestor
+            // a stored-but-expiring token was found under, so a refresh grant hits the
+            // right credential.
+            var tokenRequest = new sn_auth.GlideOAuthClientRequest();
+            tokenRequest.setParameter('oauth_requestor_context', 'rest');
+            var requestor = config.requestorId || (found.stale ? found.stale.requestor : '');
+            if (requestor) {
+                tokenRequest.setParameter('oauth_requestor', requestor);
             }
-            return { value: token.getAccessToken() };
+            tokenRequest.setParameter('oauth_provider_profile', config.authProfile);
+            if (useMid) {
+                tokenRequest.setMIDServer(config.midServer);
+            }
+            var tokenResponse = oAuthClient.requestTokenByRequest(null, tokenRequest);
+            var token = tokenResponse ? tokenResponse.getToken() : null;
+            if (token && token.getAccessToken()) {
+                return { value: token.getAccessToken() };
+            }
+
+            // The mint failed. A stored token past its refresh threshold beats nothing:
+            // the provider may still honor it (some, like GitHub, outlive their recorded
+            // expiry), and if not the 401 shows up plainly in the console.
+            if (found.stale) {
+                gs.warn('Outbound REST Console: OAuth token refresh failed (' +
+                    (this._tokenFailureDetail(tokenResponse) || 'no provider detail') +
+                    '); reusing the stored token, which may be expired.');
+                return { value: found.stale.token.getAccessToken() };
+            }
+
+            var detail = this._tokenFailureDetail(tokenResponse);
+            return { error: 'OAuth token request returned no access token.' +
+                (detail ? ' Provider response: ' + detail + '.' : '') +
+                ' Check the OAuth profile and (for MID routing) the MID server.' +
+                ' If the profile uses the authorization_code grant, first mint a token' +
+                ' interactively ("Get OAuth Token" on the REST message, or the OAuth' +
+                ' credential page) -- the console will then reuse it.' };
         } catch (e) {
             return { error: 'OAuth token request failed: ' + e };
         }
+    },
+
+    /**
+     * Search the stored tokens for this profile across every plausible requestor:
+     * the explicit requestorId, the source REST message record, any requestor
+     * profiles registered against the OAuth profile, and the blank default.
+     * Returns { fresh, stale } -- fresh is a token with >= TOKEN_MIN_TTL left;
+     * stale is { token, requestor } for the best short-lived match found.
+     */
+    _findStoredToken: function(oAuthClient, config, messageSysId) {
+        var candidates = [];
+        if (config.requestorId) {
+            candidates.push(String(config.requestorId));
+        }
+        if (messageSysId) {
+            candidates.push(String(messageSysId));
+        }
+        var stored = this._requestorCandidates(config.authProfile);
+        for (var i = 0; i < stored.length; i++) {
+            // getToken's documented arg is the requestor-profile sys_id, but requestor
+            // sys_ids are seen in the wild too -- try both, cheap either way.
+            candidates.push(stored[i].requestorProfileId);
+            if (stored[i].requestor) {
+                candidates.push(stored[i].requestor);
+            }
+        }
+        candidates.push('');
+
+        var seen = {};
+        var stale = null;
+        for (var j = 0; j < candidates.length; j++) {
+            var id = candidates[j];
+            if (seen.hasOwnProperty(id)) {
+                continue;
+            }
+            seen[id] = true;
+            var token = null;
+            try {
+                token = oAuthClient.getToken(id, config.authProfile);
+            } catch (e) { /* a bad candidate must not abort the search */ }
+            if (token && token.getAccessToken()) {
+                if (token.getExpiresIn() >= this.TOKEN_MIN_TTL) {
+                    return { fresh: token, stale: stale };
+                }
+                if (!stale) {
+                    stale = { token: token, requestor: id };
+                }
+            }
+        }
+        return { fresh: null, stale: stale };
+    },
+
+    /**
+     * Requestor profiles registered against an OAuth entity profile. Best-effort:
+     * oauth_requestor_profile is not in the verified schema set, and ACLs may hide
+     * it from this scope -- either way this just contributes no candidates.
+     */
+    _requestorCandidates: function(profileId) {
+        var out = [];
+        try {
+            var gr = new GlideRecord('oauth_requestor_profile');
+            if (!gr.isValid()) {
+                return out;
+            }
+            gr.addQuery('oauth_entity_profile', profileId);
+            gr.query();
+            while (gr.next()) {
+                // Re-check the value: on some releases addQuery silently ignores an
+                // unknown column and would hand back every requestor profile row.
+                if (gr.getValue('oauth_entity_profile') !== String(profileId)) {
+                    continue;
+                }
+                out.push({
+                    requestorProfileId: gr.getUniqueValue(),
+                    requestor: gr.getValue('oauth_requestor')
+                });
+            }
+        } catch (e) { /* fail soft: no candidates from this source */ }
+        return out;
+    },
+
+    /**
+     * Summarize why a token mint failed, from the GlideOAuthClientResponse.
+     * Each accessor is guarded: the response object may be absent or partial.
+     */
+    _tokenFailureDetail: function(tokenResponse) {
+        if (!tokenResponse) {
+            return '';
+        }
+        var parts = [];
+        var read = function(method) {
+            try {
+                if (typeof tokenResponse[method] === 'function') {
+                    var v = tokenResponse[method]();
+                    return v == null ? '' : String(v);
+                }
+            } catch (e) { /* diagnostic only -- never mask the real error */ }
+            return '';
+        };
+        var code = read('getResponseCode');
+        if (code) {
+            parts.push('HTTP ' + code);
+        }
+        var message = read('getErrorMessage');
+        if (message) {
+            parts.push(message);
+        }
+        var body = read('getBody');
+        if (body) {
+            parts.push(body.length > 500 ? body.substring(0, 500) + '…' : body);
+        }
+        return parts.join(' — ');
     },
 
     _applyParameters: function(sm, config, options) {
@@ -284,6 +422,9 @@ RestExplorerEngine.prototype = {
         }
         var fnId = fn.getUniqueValue();
         return {
+            // The parent message sys_id doubles as the OAuth requestor: a token minted
+            // via "Get OAuth Token" on the REST message record is stored against it.
+            messageSysId: parent.getUniqueValue(),
             endpoint: endpoint,
             httpMethod: fn.getValue('http_method') || 'get',
             content: fn.getValue('content') || '',

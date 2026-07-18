@@ -325,8 +325,8 @@ test('unknown auth type is rejected', () => {
 
 // --- OAuth (the MID-server workaround) -------------------------------------
 
-function oauthMock({ accessToken = 'TOKEN', expiresIn = 9999, cached = true, refreshedAccessToken = 'REFRESHED' } = {}) {
-    const calls = { requestTokenByRequest: 0, params: [], midServer: null }
+function oauthMock({ accessToken = 'TOKEN', expiresIn = 9999, cached = true, refreshedAccessToken = 'REFRESHED', tokenResponseDetail = null, tokensByRequestor = null } = {}) {
+    const calls = { requestTokenByRequest: 0, params: [], midServer: null, getToken: [] }
     const cachedToken = {
         getExpiresIn: () => expiresIn,
         getAccessToken: () => accessToken,
@@ -339,10 +339,20 @@ function oauthMock({ accessToken = 'TOKEN', expiresIn = 9999, cached = true, ref
         calls,
         GlideOAuthClient: function () {
             return {
-                getToken: () => (cached ? cachedToken : null),
+                // tokensByRequestor maps a requestor id to { accessToken, expiresIn };
+                // when set, only those requestors have a stored token. Otherwise the
+                // legacy behavior: every lookup returns the one cached token (or none).
+                getToken: (requestor) => {
+                    calls.getToken.push(requestor)
+                    if (tokensByRequestor) {
+                        const t = tokensByRequestor[requestor]
+                        return t ? { getExpiresIn: () => t.expiresIn ?? 9999, getAccessToken: () => t.accessToken } : null
+                    }
+                    return cached ? cachedToken : null
+                },
                 requestTokenByRequest: () => {
                     calls.requestTokenByRequest += 1
-                    return { getToken: () => refreshedToken }
+                    return Object.assign({ getToken: () => refreshedToken }, tokenResponseDetail)
                 },
             }
         },
@@ -400,6 +410,65 @@ test('a token refresh that returns no access token is a clear error, not "Bearer
     assert.equal(r.ok, false)
     assert.match(r.error, /no access token/)
     assert.equal(msg.first('execute'), undefined, 'must not send the request')
+})
+
+test('oauth reuses a token minted from the REST message record ("Get OAuth Token")', () => {
+    // Authorization-code providers (GitHub) cannot mint headlessly: the token the
+    // user minted interactively is stored against the REST message record, and the
+    // console must find it there.
+    const auth = oauthMock({ tokensByRequestor: { rm1: { accessToken: 'FROM-MESSAGE' } }, refreshedAccessToken: '' })
+    const { engine, msg } = loadEngine({ sn_auth: auth, tables: catFactsTables() })
+    const r = engine.execute({
+        source: 'restMessage', restMessage: 'Cat Facts', method: 'Get Random Fact',
+        authType: 'oauth', authProfile: 'oap1',
+    })
+    assert.equal(r.ok, true)
+    assert.deepEqual(msg.first('setRequestHeader').args, ['Authorization', 'Bearer FROM-MESSAGE'])
+    assert.equal(auth.calls.requestTokenByRequest, 0, 'a fresh stored token must not trigger a mint')
+})
+
+test('oauth finds a token via the profile requestor registrations (credential page)', () => {
+    const auth = oauthMock({ tokensByRequestor: { cred9: { accessToken: 'FROM-CRED' } }, refreshedAccessToken: '' })
+    const tables = {
+        oauth_requestor_profile: [
+            { sys_id: 'rp1', oauth_entity_profile: 'oap1', oauth_requestor: 'cred9' },
+            { sys_id: 'rp2', oauth_entity_profile: 'other-profile', oauth_requestor: 'wrong' },
+        ],
+    }
+    const { engine, msg } = loadEngine({ sn_auth: auth, tables })
+    const r = engine.execute({ source: 'url', endpoint: 'https://x', authType: 'oauth', authProfile: 'oap1' })
+    assert.equal(r.ok, true)
+    assert.deepEqual(msg.first('setRequestHeader').args, ['Authorization', 'Bearer FROM-CRED'])
+    assert.ok(!auth.calls.getToken.includes('wrong'), 'requestor rows of other profiles must not be tried')
+})
+
+test('oauth falls back to a stale stored token when the mint fails', () => {
+    const auth = oauthMock({ cached: true, expiresIn: 10, accessToken: 'STALE', refreshedAccessToken: '' })
+    const { engine, msg, warnings } = loadEngine({ sn_auth: auth })
+    const r = engine.execute({ source: 'url', endpoint: 'https://x', authType: 'oauth', authProfile: 'oap1' })
+    assert.equal(r.ok, true, 'a stale token beats no token')
+    assert.deepEqual(msg.first('setRequestHeader').args, ['Authorization', 'Bearer STALE'])
+    assert.equal(auth.calls.requestTokenByRequest, 1, 'a refresh must still be attempted first')
+    assert.ok(warnings.some((w) => /may be expired/.test(w)), 'the fallback must be logged')
+})
+
+test('a failed token mint surfaces the provider response diagnostics', () => {
+    const auth = oauthMock({
+        cached: false,
+        refreshedAccessToken: '',
+        tokenResponseDetail: {
+            getResponseCode: () => '401',
+            getErrorMessage: () => 'access_denied',
+            getBody: () => '{"error":"invalid_client"}',
+        },
+    })
+    const { engine } = loadEngine({ sn_auth: auth })
+    const r = engine.execute({ source: 'url', endpoint: 'https://x', authType: 'oauth', authProfile: 'oap1' })
+    assert.equal(r.ok, false)
+    assert.match(r.error, /no access token/)
+    assert.match(r.error, /HTTP 401/)
+    assert.match(r.error, /access_denied/)
+    assert.match(r.error, /invalid_client/)
 })
 
 test('oauth without a profile fails instead of firing "Bearer undefined"', () => {

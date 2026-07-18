@@ -1,4 +1,4 @@
-api.controller = function($scope) {
+api.controller = function($scope, $window) {
     /* global angular */
     var c = this;
 
@@ -107,6 +107,29 @@ api.controller = function($scope) {
                 return { k: v.name, v: v.value };
             });
         });
+    };
+
+    // ---- Mint an OAuth token interactively (authorization-code flow) ------
+    // Opens the platform's own token-initiation page -- the same one the
+    // "Get OAuth Token" UI action on a REST message uses. The provider redirect
+    // back to oauth_redirect.do stores the token; the engine's stored-token
+    // search finds it on the next Send. The requestor mirrors the native flow:
+    // the selected REST message record when there is one, else the profile
+    // itself (the engine searches every requestor registered on the profile,
+    // so either way the token is found).
+    c.getOAuthToken = function() {
+        if (!c.req.authProfile) { return; }
+        var onMessage = c.req.source === 'restMessage' && c.req.restMessage;
+        var params = {
+            oauth_requestor_context: onMessage ? 'rest_message' : 'rest',
+            oauth_requestor: onMessage ? c.req.restMessage : c.req.authProfile,
+            oauth_provider_profile: c.req.authProfile,
+            response_type: 'code'
+        };
+        var query = Object.keys(params).map(function(k) {
+            return encodeURIComponent(k) + '=' + encodeURIComponent(params[k]);
+        }).join('&');
+        $window.open('/oauth_initiator.do?' + query, 'rest_gui_oauth_popup', 'width=800,height=700');
     };
 
     // ---- Whether Send is allowed for the current source ------------------
