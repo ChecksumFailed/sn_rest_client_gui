@@ -12,10 +12,14 @@
     "build": "now-sdk build",
     "deploy": "now-sdk install",
     "transform": "now-sdk transform",
-    "types": "now-sdk dependencies"
+    "types": "now-sdk dependencies",
+    "screenshots:install": "playwright install chromium",
+    "screenshots": "playwright test"
   },
   "devDependencies": {
+    "@playwright/test": "^1.61.1",
+    "@servicenow/glide": "27.0.5",
     "@servicenow/sdk": "4.8.1",
-    "@servicenow/glide": "27.0.5"
+    "dotenv": "^17.4.2"
   }
 }
