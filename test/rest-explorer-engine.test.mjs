@@ -65,7 +65,9 @@ function makeResponse({ error = false, status = 200, headers = {}, body = '{}', 
     }
 }
 
-/** GlideRecord mock driven by an in-memory table map: { table: [rows...] }. */
+/** GlideRecord mock driven by an in-memory table map: { table: [rows...] }. Rows inserted
+ *  via initialize()/setValue()/insert() are pushed back into the shared `tables[table]`
+ *  array, so a test can inspect what a Script Include wrote (e.g. an audit log row). */
 function makeGlideRecordClass(tables) {
     return function GlideRecord(table) {
         let rows = (tables[table] || []).slice()
@@ -89,6 +91,14 @@ function makeGlideRecordClass(tables) {
             next() { idx += 1; if (idx < rows.length) { current = rows[idx]; return true } return false },
             getValue(f) { return current && current[f] != null ? current[f] : '' },
             getUniqueValue() { return current ? current.sys_id : '' },
+            initialize() { current = {} },
+            setValue(f, v) { if (current) { current[f] = v } },
+            insert() {
+                current.sys_id = current.sys_id || ('mock' + ((tables[table] || []).length + 1))
+                tables[table] = tables[table] || []
+                tables[table].push(current)
+                return current.sys_id
+            },
         }
     }
 }
@@ -97,7 +107,7 @@ function makeGlideRecordClass(tables) {
  * Load the engine into a fresh sandbox and return an instance plus the pieces
  * the tests want to inspect.
  */
-function loadEngine({ hasRole, tables = {}, response, sn_auth = {} } = {}) {
+function loadEngine({ hasRole, tables = {}, response, sn_auth = {}, getProperty } = {}) {
     const allow = hasRole || (() => true)
     const msg = makeSpyMessage(response || makeResponse())
     const warnings = []
@@ -106,7 +116,7 @@ function loadEngine({ hasRole, tables = {}, response, sn_auth = {} } = {}) {
         gs: {
             hasRole: (r) => allow(r),
             warn: (m) => warnings.push(String(m)),
-            getProperty: (k, d) => d,
+            getProperty: getProperty || ((k, d) => d),
         },
         GlideRecord: makeGlideRecordClass(tables),
         sn_ws: { RESTMessageV2: function () { return msg } },
@@ -115,8 +125,10 @@ function loadEngine({ hasRole, tables = {}, response, sn_auth = {} } = {}) {
     vm.createContext(sandbox)
     vm.runInContext(ENGINE_SOURCE, sandbox)
     const Engine = sandbox.RestExplorerEngine
-    return { engine: new Engine(), msg, warnings, Engine }
+    return { engine: new Engine(), msg, warnings, Engine, tables }
 }
+
+const AUDIT_TABLE = 'x_1676196_rest_gui_audit_log'
 
 const ROLE = 'x_1676196_rest_gui.user'
 
@@ -147,6 +159,33 @@ test('execute() refuses a caller without the role or admin', () => {
 test('execute() allows an admin even without the explorer role', () => {
     const { engine } = loadEngine({ hasRole: (r) => r === 'admin' })
     const r = engine.execute({ source: 'url', endpoint: 'https://x' })
+    assert.equal(r.ok, true)
+})
+
+// --- Direct URL mode property gate ------------------------------------------
+
+test('url mode is refused when the enable_direct_url property is off', () => {
+    const { engine, msg } = loadEngine({
+        getProperty: (k, d) => (k === 'x_1676196_rest_gui.enable_direct_url' ? 'false' : d),
+    })
+    const r = engine.execute({ source: 'url', endpoint: 'https://x' })
+    assert.equal(r.ok, false)
+    assert.match(r.error, /Direct URL mode is disabled/)
+    assert.equal(msg.calls.length, 0, 'no request should be built when the mode is disabled')
+})
+
+test('url mode is allowed by default (property absent/unset)', () => {
+    const { engine } = loadEngine()
+    const r = engine.execute({ source: 'url', endpoint: 'https://x' })
+    assert.equal(r.ok, true)
+})
+
+test('rest-message mode is unaffected by the direct-url property', () => {
+    const { engine } = loadEngine({
+        tables: catFactsTables(),
+        getProperty: (k, d) => (k === 'x_1676196_rest_gui.enable_direct_url' ? 'false' : d),
+    })
+    const r = engine.execute({ source: 'restMessage', restMessage: 'Cat Facts', method: 'Get Random Fact' })
     assert.equal(r.ok, true)
 })
 
@@ -703,4 +742,49 @@ test('stored auth: mutual auth / unrecognized types get no preselection', () => 
     const { engine } = loadEngine()
     const auth = engine._mapStoredAuth(rec({}), rec({ authentication_type: 'mutual_auth' }))
     assert.equal(auth.type, 'none')
+})
+
+// --- Audit log ---------------------------------------------------------------
+// The engine writes one row per execute() call via _logRequest(), regardless of
+// success/failure, as long as the audit table exists on the instance.
+
+test('a successful call writes an audit row without the query string or any secret', () => {
+    const { engine, tables } = loadEngine({ tables: { [AUDIT_TABLE]: [] } })
+    engine.execute({
+        source: 'url', endpoint: 'https://x?token=SECRET', httpMethod: 'get',
+        authType: 'apikey', apiKey: { placement: 'query', name: 'token', value: 'SECRET' },
+    })
+    assert.equal(tables[AUDIT_TABLE].length, 1)
+    const row = tables[AUDIT_TABLE][0]
+    assert.equal(row.source, 'url')
+    assert.equal(row.endpoint, 'https://x', 'query string (which may carry a secret) must not be logged')
+    assert.equal(row.http_method, 'get')
+    assert.equal(row.auth_type, 'apikey')
+    assert.equal(row.ok, true)
+    assert.equal(row.status_code, 200)
+    assert.equal(JSON.stringify(row).indexOf('SECRET'), -1, 'no secret value anywhere in the logged row')
+})
+
+test('a refused call (missing role) still writes an audit row', () => {
+    const { engine, tables } = loadEngine({ hasRole: () => false, tables: { [AUDIT_TABLE]: [] } })
+    engine.execute({ source: 'url', endpoint: 'https://x' })
+    assert.equal(tables[AUDIT_TABLE].length, 1)
+    assert.equal(tables[AUDIT_TABLE][0].ok, false)
+    assert.match(tables[AUDIT_TABLE][0].error, /role required/)
+})
+
+test('a REST message call logs the message id and function name, not the endpoint template', () => {
+    const { engine, tables } = loadEngine({ tables: Object.assign({ [AUDIT_TABLE]: [] }, catFactsTables()) })
+    engine.execute({ source: 'restMessage', restMessage: 'Cat Facts', method: 'Get Random Fact', variables: { max_length: '140' } })
+    const row = tables[AUDIT_TABLE][0]
+    assert.equal(row.source, 'restMessage')
+    assert.equal(row.rest_message, 'Cat Facts')
+    assert.equal(row.function_name, 'Get Random Fact')
+    assert.equal(row.endpoint, 'https://catfact.ninja/fact', 'query string stripped even when built from substitutions')
+})
+
+test('missing audit table fails soft -- execute() still returns its result', () => {
+    const { engine } = loadEngine() // no AUDIT_TABLE entry in `tables`
+    const r = engine.execute({ source: 'url', endpoint: 'https://x' })
+    assert.equal(r.ok, true)
 })

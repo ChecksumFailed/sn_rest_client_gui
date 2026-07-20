@@ -73,6 +73,11 @@ api.controller = function($scope, $window, $timeout) {
         } catch (e) { return; }
         if (!saved || !saved.ts || (Date.now() - saved.ts) > STATE_TTL_MS || !saved.req) { return; }
         angular.extend(c.req, saved.req);
+        // The property may have been disabled since this snapshot was saved (e.g. the
+        // admin turned it off mid-flow); do not restore into a mode the server will refuse.
+        if (c.req.source === 'url' && !c.data.directUrlEnabled) {
+            c.req.source = 'restMessage';
+        }
         // The Method dropdown's options (c.methods) are not part of c.req; reload them so
         // the restored method shows its label instead of a blank "unknown option" entry.
         // Deferred so the SP server proxy is fully wired before the call.

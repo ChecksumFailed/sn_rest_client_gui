@@ -184,6 +184,10 @@ declare global {
                         table: 'sys_scope_privilege'
                         id: 'ee434b57934a8310e4bb7ee32bba109d'
                     }
+                    'enable-direct-url': {
+                        table: 'sys_properties'
+                        id: '063e357d599a4eee9a220dbde64572bf'
+                    }
                     f28c261393868310e4bb7ee32bba105b: {
                         table: 'sys_scope_privilege'
                         id: 'f28c261393868310e4bb7ee32bba105b'
@@ -251,10 +255,254 @@ declare global {
                 }
                 composite: [
                     {
+                        table: 'sys_documentation'
+                        id: '00bf92e3fbb247b5ae0cc532176cd9f0'
+                        key: {
+                            name: 'x_1676196_rest_gui_audit_log'
+                            element: 'error'
+                            language: 'en'
+                        }
+                    },
+                    {
+                        table: 'sys_dictionary'
+                        id: '03ae1f0d0dec41d59adfe1059c892f6d'
+                        key: {
+                            name: 'x_1676196_rest_gui_audit_log'
+                            element: 'rest_message'
+                        }
+                    },
+                    {
+                        table: 'sys_dictionary'
+                        id: '07b2d9eddb2640f8a5df152290cfec38'
+                        key: {
+                            name: 'x_1676196_rest_gui_audit_log'
+                            element: 'mid_server'
+                        }
+                    },
+                    {
+                        table: 'sys_documentation'
+                        id: '0a346fc56590449f803b33b6afc06a4a'
+                        key: {
+                            name: 'x_1676196_rest_gui_audit_log'
+                            element: 'source'
+                            language: 'en'
+                        }
+                    },
+                    {
                         table: 'sp_page'
                         id: '4dd5edca16d94cc98a704422f499a05b'
                         key: {
                             id: 'rest_explorer'
+                        }
+                    },
+                    {
+                        table: 'sys_dictionary'
+                        id: '5060f298257942cdbe8cc2b28fac2821'
+                        key: {
+                            name: 'x_1676196_rest_gui_audit_log'
+                            element: 'function_name'
+                        }
+                    },
+                    {
+                        table: 'sys_choice'
+                        id: '54fda6663cb647078648bd0247a51582'
+                        key: {
+                            name: 'x_1676196_rest_gui_audit_log'
+                            element: 'source'
+                            value: 'url'
+                        }
+                    },
+                    {
+                        table: 'sys_dictionary'
+                        id: '5d699d3be7db413c9ca28676d8d8df52'
+                        key: {
+                            name: 'x_1676196_rest_gui_audit_log'
+                            element: 'ok'
+                        }
+                    },
+                    {
+                        table: 'sys_db_object'
+                        id: '60ce23ca514c4e1d9792c0da678f2fbc'
+                        key: {
+                            name: 'x_1676196_rest_gui_audit_log'
+                        }
+                    },
+                    {
+                        table: 'sys_choice_set'
+                        id: '6c335053d0fe4180af66854a2f5771f5'
+                        key: {
+                            name: 'x_1676196_rest_gui_audit_log'
+                            element: 'source'
+                        }
+                    },
+                    {
+                        table: 'sys_documentation'
+                        id: '719f69b25af947248a96a67352dc8e2f'
+                        key: {
+                            name: 'x_1676196_rest_gui_audit_log'
+                            element: 'http_method'
+                            language: 'en'
+                        }
+                    },
+                    {
+                        table: 'sys_dictionary'
+                        id: '7975eadebc5143c1a1129744a81b5dae'
+                        key: {
+                            name: 'x_1676196_rest_gui_audit_log'
+                            element: 'duration_ms'
+                        }
+                    },
+                    {
+                        table: 'sys_documentation'
+                        id: '7a4cd10d0e63416a902d52596b65e451'
+                        key: {
+                            name: 'x_1676196_rest_gui_audit_log'
+                            element: 'status_code'
+                            language: 'en'
+                        }
+                    },
+                    {
+                        table: 'sys_dictionary'
+                        id: '7b53bcc7aea14ed493575f4426e2e812'
+                        key: {
+                            name: 'x_1676196_rest_gui_audit_log'
+                            element: 'endpoint'
+                        }
+                    },
+                    {
+                        table: 'sys_documentation'
+                        id: '8359010599a348529baceac04ee4718c'
+                        key: {
+                            name: 'x_1676196_rest_gui_audit_log'
+                            element: 'function_name'
+                            language: 'en'
+                        }
+                    },
+                    {
+                        table: 'ua_table_licensing_config'
+                        id: '8389e6e527db4906b4aaf6e791a30d80'
+                        key: {
+                            name: 'x_1676196_rest_gui_audit_log'
+                        }
+                    },
+                    {
+                        table: 'sys_documentation'
+                        id: '8ba75adadbb1488cbe774392bce53c88'
+                        key: {
+                            name: 'x_1676196_rest_gui_audit_log'
+                            element: 'mid_server'
+                            language: 'en'
+                        }
+                    },
+                    {
+                        table: 'sys_documentation'
+                        id: '9e2355e2b42644e890ac5f3dd7bed9ef'
+                        key: {
+                            name: 'x_1676196_rest_gui_audit_log'
+                            element: 'ok'
+                            language: 'en'
+                        }
+                    },
+                    {
+                        table: 'sys_dictionary'
+                        id: '9f4859c7e2dd4f94b03e8afe1545923c'
+                        key: {
+                            name: 'x_1676196_rest_gui_audit_log'
+                            element: 'NULL'
+                        }
+                    },
+                    {
+                        table: 'sys_dictionary'
+                        id: 'a07621f36eb549ebbd2a4c48c509abc8'
+                        key: {
+                            name: 'x_1676196_rest_gui_audit_log'
+                            element: 'auth_type'
+                        }
+                    },
+                    {
+                        table: 'sys_documentation'
+                        id: 'a56efc4302fa46749beee80131e16224'
+                        key: {
+                            name: 'x_1676196_rest_gui_audit_log'
+                            element: 'duration_ms'
+                            language: 'en'
+                        }
+                    },
+                    {
+                        table: 'sys_dictionary'
+                        id: 'be10e2f1ea06403a88ca42ea145167f3'
+                        key: {
+                            name: 'x_1676196_rest_gui_audit_log'
+                            element: 'error'
+                        }
+                    },
+                    {
+                        table: 'sys_documentation'
+                        id: 'c62c72ed8b144e1aace1d5e3e0d56a05'
+                        key: {
+                            name: 'x_1676196_rest_gui_audit_log'
+                            element: 'rest_message'
+                            language: 'en'
+                        }
+                    },
+                    {
+                        table: 'sys_choice'
+                        id: 'cc0298a0e23d497d801803e486e0db72'
+                        key: {
+                            name: 'x_1676196_rest_gui_audit_log'
+                            element: 'source'
+                            value: 'restMessage'
+                        }
+                    },
+                    {
+                        table: 'sys_dictionary'
+                        id: 'd1b8a6990fd341e3b97f9fd7478ac0a3'
+                        key: {
+                            name: 'x_1676196_rest_gui_audit_log'
+                            element: 'source'
+                        }
+                    },
+                    {
+                        table: 'sys_dictionary'
+                        id: 'e13d6c21fcc0485aad096240be59d509'
+                        key: {
+                            name: 'x_1676196_rest_gui_audit_log'
+                            element: 'status_code'
+                        }
+                    },
+                    {
+                        table: 'sys_documentation'
+                        id: 'ea17787d2f3b4270b407b82e99a7e4d4'
+                        key: {
+                            name: 'x_1676196_rest_gui_audit_log'
+                            element: 'NULL'
+                            language: 'en'
+                        }
+                    },
+                    {
+                        table: 'sys_documentation'
+                        id: 'f0edf30031ae48399b7f848b8ec1d0fe'
+                        key: {
+                            name: 'x_1676196_rest_gui_audit_log'
+                            element: 'endpoint'
+                            language: 'en'
+                        }
+                    },
+                    {
+                        table: 'sys_documentation'
+                        id: 'f2ba50e2ef3745a88284a46f786fdc34'
+                        key: {
+                            name: 'x_1676196_rest_gui_audit_log'
+                            element: 'auth_type'
+                            language: 'en'
+                        }
+                    },
+                    {
+                        table: 'sys_dictionary'
+                        id: 'f5c38c6c83a9498c8546ea1bf27340c7'
+                        key: {
+                            name: 'x_1676196_rest_gui_audit_log'
+                            element: 'http_method'
                         }
                     },
                     {

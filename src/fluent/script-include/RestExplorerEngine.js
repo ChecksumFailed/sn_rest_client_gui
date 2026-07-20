@@ -10,6 +10,14 @@ RestExplorerEngine.prototype = {
     // supplied and OAuthMidSelector did not return one. Configure per-instance.
     DEFAULT_MID_PROPERTY: 'x_1676196_rest_gui.default_mid_server',
 
+    // Gates Direct URL mode (config.source === 'url'). Checked here, not only hidden in
+    // the widget, so disabling it actually blocks the call rather than just the UI option.
+    ENABLE_DIRECT_URL_PROPERTY: 'x_1676196_rest_gui.enable_direct_url',
+
+    // Audit trail of every execute() call -- see src/fluent/table/audit-log.now.ts for why
+    // bodies/headers/query strings are deliberately excluded.
+    AUDIT_LOG_TABLE: 'x_1676196_rest_gui_audit_log',
+
     // Seconds of remaining token life below which we force a refresh instead of
     // reusing the cached token.
     TOKEN_MIN_TTL: 60,
@@ -41,6 +49,16 @@ RestExplorerEngine.prototype = {
      * @returns {Object} { ok, status, headers, body, error, url }
      */
     execute: function(config) {
+        config = config || {};
+        var start = Date.now();
+        var result = this._run(config);
+        this._logRequest(config, result, Date.now() - start);
+        return result;
+    },
+
+    /** The actual execute() logic, wrapped by execute() so every return path -- success,
+     *  HTTP error, or a refused/invalid call -- gets audit-logged in one place. */
+    _run: function(config) {
         // gs.hasRole() already returns true for admins on any role; the explicit admin
         // check is kept so the rule is visible here and holds under a mocked gs.
         if (!gs.hasRole(this.EXPLORER_ROLE) && !gs.hasRole('admin')) {
@@ -49,6 +67,9 @@ RestExplorerEngine.prototype = {
         var useUrl = config.source === 'url';
         var built;
         if (useUrl) {
+            if (!this._directUrlEnabled()) {
+                return this._fail('Direct URL mode is disabled by the system administrator.');
+            }
             if (!config.endpoint) {
                 return this._fail('A request URL is required for a direct URL call.');
             }
@@ -491,6 +512,49 @@ RestExplorerEngine.prototype = {
     _timeoutSeconds: function(value) {
         var t = parseInt(value, 10);
         return t > 0 ? t : 60;
+    },
+
+    /** Whether Direct URL mode is turned on. Defaults to enabled -- an admin opts OUT. */
+    _directUrlEnabled: function() {
+        return gs.getProperty(this.ENABLE_DIRECT_URL_PROPERTY, 'true') === 'true';
+    },
+
+    /**
+     * Write one audit row per execute() call -- fire-and-forget: a logging failure
+     * (table missing, ACL denies the insert) must never sink an otherwise-good response.
+     */
+    _logRequest: function(config, result, durationMs) {
+        try {
+            var gr = new GlideRecord(this.AUDIT_LOG_TABLE);
+            if (!gr.isValid()) {
+                return; // Table not present on this instance -- fail soft.
+            }
+            var useUrl = config.source === 'url';
+            gr.initialize();
+            gr.setValue('source', useUrl ? 'url' : 'restMessage');
+            gr.setValue('rest_message', useUrl ? '' : (config.restMessage || ''));
+            gr.setValue('function_name', useUrl ? '' : (config.method || ''));
+            gr.setValue('http_method', String(config.httpMethod || '').toLowerCase());
+            gr.setValue('endpoint', this._sanitizeEndpointForLog((result && result.url) || config.endpoint || ''));
+            gr.setValue('mid_server', config.midServer || '');
+            gr.setValue('auth_type', config.authType || 'none');
+            gr.setValue('status_code', result && result.status != null ? result.status : '');
+            gr.setValue('ok', !!(result && result.ok));
+            gr.setValue('error', result && result.error ? String(result.error).substring(0, 4000) : '');
+            gr.setValue('duration_ms', durationMs);
+            gr.insert();
+        } catch (e) {
+            gs.warn('RestExplorerEngine: failed to write audit log entry: ' + e);
+        }
+    },
+
+    /** Strip the query string before logging -- query params can carry secrets (an API
+     *  key placed in the query, or a resolved ${token}), and the audit log must not
+     *  become a second place credentials leak from. */
+    _sanitizeEndpointForLog: function(url) {
+        if (!url) { return ''; }
+        var q = String(url).indexOf('?');
+        return q === -1 ? String(url) : String(url).substring(0, q);
     },
 
     /** Build the final request URL from the endpoint plus every setQueryParameter call

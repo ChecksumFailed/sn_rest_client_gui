@@ -21,7 +21,7 @@
             <input type="radio" ng-model="c.req.source" value="restMessage"
                    ng-change="c.onSourceChange()"> REST Message
           </label>
-          <label class="radio-inline">
+          <label class="radio-inline" ng-if="data.directUrlEnabled">
             <input type="radio" ng-model="c.req.source" value="url"
                    ng-change="c.onSourceChange()"> Direct URL
           </label>

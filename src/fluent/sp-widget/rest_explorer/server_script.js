@@ -20,6 +20,11 @@
         data.basicProfiles = _readChoices('sys_auth_profile_basic', 'name', 'sys_id', null);
         data.midServers = _readChoices('ecc_agent', 'name', 'name', 'status=Up');
 
+        // Hides the "Direct URL" option client-side; the engine re-checks the same
+        // property in execute(), so disabling it actually blocks the call too, not
+        // just the UI option.
+        data.directUrlEnabled = gs.getProperty(RestExplorerEngine.prototype.ENABLE_DIRECT_URL_PROPERTY, 'true') === 'true';
+
         // Suggested MID server. OAuthMidSelector is undocumented, so wrap defensively;
         // on any failure the dropdown simply has no preselection and the user picks.
         data.suggestedMid = '';
