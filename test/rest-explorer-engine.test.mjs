@@ -748,21 +748,97 @@ test('stored auth: mutual auth / unrecognized types get no preselection', () => 
 // The engine writes one row per execute() call via _logRequest(), regardless of
 // success/failure, as long as the audit table exists on the instance.
 
-test('a successful call writes an audit row without the query string or any secret', () => {
+test('a successful call writes an audit row with the full URL but a redacted secret', () => {
     const { engine, tables } = loadEngine({ tables: { [AUDIT_TABLE]: [] } })
     engine.execute({
-        source: 'url', endpoint: 'https://x?token=SECRET', httpMethod: 'get',
+        source: 'url', endpoint: 'https://x', httpMethod: 'get',
         authType: 'apikey', apiKey: { placement: 'query', name: 'token', value: 'SECRET' },
     })
     assert.equal(tables[AUDIT_TABLE].length, 1)
     const row = tables[AUDIT_TABLE][0]
     assert.equal(row.source, 'url')
-    assert.equal(row.endpoint, 'https://x', 'query string (which may carry a secret) must not be logged')
+    assert.equal(row.endpoint, 'https://x?token=REDACTED', 'full URL kept, but the sensitive param value redacted')
     assert.equal(row.http_method, 'get')
     assert.equal(row.auth_type, 'apikey')
     assert.equal(row.ok, true)
     assert.equal(row.status_code, 200)
     assert.equal(JSON.stringify(row).indexOf('SECRET'), -1, 'no secret value anywhere in the logged row')
+})
+
+test('a non-sensitive query parameter is kept as-is in the logged URL', () => {
+    const { engine, tables } = loadEngine({ tables: { [AUDIT_TABLE]: [] } })
+    engine.execute({ source: 'url', endpoint: 'https://x?limit=10&format=json', httpMethod: 'get' })
+    assert.equal(tables[AUDIT_TABLE][0].endpoint, 'https://x?limit=10&format=json')
+})
+
+test('a custom-named API key query param is redacted even off the generic denylist', () => {
+    const { engine, tables } = loadEngine({ tables: { [AUDIT_TABLE]: [] } })
+    engine.execute({
+        source: 'url', endpoint: 'https://x?limit=10', httpMethod: 'get',
+        authType: 'apikey', apiKey: { placement: 'query', name: 'rapidapi_key', value: 'SECRET' },
+    })
+    const row = tables[AUDIT_TABLE][0]
+    assert.equal(row.endpoint, 'https://x?limit=10&rapidapi_key=REDACTED')
+    assert.equal(JSON.stringify(row).indexOf('SECRET'), -1)
+})
+
+test('request_body is not captured when the debug property is off (default)', () => {
+    const { engine, tables } = loadEngine({ tables: { [AUDIT_TABLE]: [] } })
+    engine.execute({ source: 'url', endpoint: 'https://x', httpMethod: 'post', body: '{"password":"hunter2"}' })
+    assert.equal(tables[AUDIT_TABLE][0].request_body, '')
+})
+
+test('request_body is captured when the debug property is on', () => {
+    const { engine, tables } = loadEngine({
+        tables: { [AUDIT_TABLE]: [] },
+        getProperty: (k, d) => (k === 'x_1676196_rest_gui.debug' ? 'true' : d),
+    })
+    engine.execute({ source: 'url', endpoint: 'https://x', httpMethod: 'post', body: '{"a":1}' })
+    assert.equal(tables[AUDIT_TABLE][0].request_body, '{"a":1}')
+})
+
+test('audit row records the OAuth profile used, and leaves basic_auth_profile blank', () => {
+    const { engine, tables } = loadEngine({ tables: { [AUDIT_TABLE]: [] } })
+    engine.execute({
+        source: 'url', endpoint: 'https://x', httpMethod: 'get',
+        authType: 'oauth', authProfile: 'oauth-profile-1',
+    })
+    const row = tables[AUDIT_TABLE][0]
+    assert.equal(row.oauth_profile, 'oauth-profile-1')
+    assert.equal(row.basic_auth_profile, '')
+})
+
+test('audit row records the Basic Auth profile used, and leaves oauth_profile blank', () => {
+    const { engine, tables } = loadEngine({ tables: { [AUDIT_TABLE]: [] } })
+    engine.execute({
+        source: 'url', endpoint: 'https://x', httpMethod: 'get',
+        authType: 'basic', authProfile: 'basic-profile-1',
+    })
+    const row = tables[AUDIT_TABLE][0]
+    assert.equal(row.basic_auth_profile, 'basic-profile-1')
+    assert.equal(row.oauth_profile, '')
+})
+
+test('audit row leaves both profile fields blank for manual-entry basic auth', () => {
+    const { engine, tables } = loadEngine({ tables: { [AUDIT_TABLE]: [] } })
+    engine.execute({
+        source: 'url', endpoint: 'https://x', httpMethod: 'get',
+        authType: 'basic', basic: { mode: 'manual', username: 'u', password: 'p' },
+    })
+    const row = tables[AUDIT_TABLE][0]
+    assert.equal(row.basic_auth_profile, '')
+    assert.equal(row.oauth_profile, '')
+})
+
+test('audit row leaves both profile fields blank for API key / no auth', () => {
+    const { engine, tables } = loadEngine({ tables: { [AUDIT_TABLE]: [] } })
+    engine.execute({
+        source: 'url', endpoint: 'https://x', httpMethod: 'get',
+        authType: 'apikey', apiKey: { placement: 'header', name: 'X-Key', value: 'v' },
+    })
+    const row = tables[AUDIT_TABLE][0]
+    assert.equal(row.basic_auth_profile, '')
+    assert.equal(row.oauth_profile, '')
 })
 
 test('a refused call (missing role) still writes an audit row', () => {
@@ -780,7 +856,7 @@ test('a REST message call logs the message id and function name, not the endpoin
     assert.equal(row.source, 'restMessage')
     assert.equal(row.rest_message, 'Cat Facts')
     assert.equal(row.function_name, 'Get Random Fact')
-    assert.equal(row.endpoint, 'https://catfact.ninja/fact', 'query string stripped even when built from substitutions')
+    assert.equal(row.endpoint, 'https://catfact.ninja/fact?max_length=140', 'full resolved URL, including substituted tokens')
 })
 
 test('missing audit table fails soft -- execute() still returns its result', () => {

@@ -37,11 +37,29 @@ definition (`*.now.ts`) references its co-located raw source via `Now.include()`
 | `src/fluent/sp-widget/rest_explorer/widget.now.ts` | `server_script.js`, `client_controller.js`, `widget.html`, `widget.css` | Service Portal widget `Outbound REST Console` (`sp_widget`) |
 | `src/fluent/sp-page/rest-explorer-page.now.ts` | — | Service Portal page (`sp_page`, `?id=rest_explorer`) hosting the widget |
 | `src/fluent/security/roles.now.ts` | — | Role `x_1676196_rest_gui.user` (`sys_user_role`) |
-| `src/fluent/security/properties.now.ts` | — | System property `x_1676196_rest_gui.default_mid_server` (`sys_properties`) |
+| `src/fluent/security/properties.now.ts` | — | System properties `default_mid_server`, `enable_direct_url`, `debug`, `sensitive_query_params` (`sys_properties`) |
+| `src/fluent/table/audit-log.now.ts` | — | Table `x_1676196_rest_gui_audit_log` (`sys_db_object`), plus its read ACL |
 
 No external JS/CSS libraries are required — JSON response bodies are pretty-printed in-controller
 and rendered as plain text (no syntax highlighting), so there is no CodeMirror/Prism dependency
 to wire up.
+
+## Audit log
+
+Every call made through the console — success, HTTP error, or refused/invalid — is written to
+`x_1676196_rest_gui_audit_log` by the engine itself. It records who ran what, when, against which
+endpoint, and how it turned out; it does **not** record response bodies or request/response headers
+(so no Bearer token or Basic credential ever lands there).
+
+- **Endpoint** is logged in full, including the query string, but with the values of any query
+  parameter named in the `x_1676196_rest_gui.sensitive_query_params` property (default: the usual
+  suspects — `api_key`, `token`, `secret`, `password`, etc.) replaced with `REDACTED`. An API key
+  placed in the query string is redacted automatically even if its name isn't on that list.
+- **Request body** is only recorded when the `x_1676196_rest_gui.debug` property is turned on
+  (default off) — bodies can carry secrets a console like this shouldn't keep a second copy of.
+- **Who can see what:** the `x_1676196_rest_gui.user` role only grants read access to rows the
+  reader themselves created; admins can see every row.
+- **Retention:** a Table Cleaner job purges rows after 14 days (matched on the row's creation date).
 
 ## Installation
 
@@ -61,8 +79,16 @@ per the ServiceNow SDK docs before deploying.
    > grant the role as carefully as you would admin.
 4. Open the page at `/<portal>?id=rest_explorer` (any Service Portal), or drop the `Outbound REST Console`
    widget onto a page of your choosing.
-5. *(Optional)* set the system property `x_1676196_rest_gui.default_mid_server` to a MID server name used
-   as a fallback suggestion when auto-selection returns nothing.
+5. *(Optional)* system properties, all under **System Properties** on the installed scope:
+   - `x_1676196_rest_gui.default_mid_server` — fallback MID server name suggested when
+     auto-selection returns nothing.
+   - `x_1676196_rest_gui.enable_direct_url` — turn off Direct URL mode to restrict the console to
+     vetted REST Message records only. Admin-write.
+   - `x_1676196_rest_gui.debug` — turn on to also capture request bodies in the audit log. Off by
+     default since bodies can carry secrets. Admin-write.
+   - `x_1676196_rest_gui.sensitive_query_params` — comma-separated, case-insensitive query
+     parameter names to redact from audit log URLs; setting it **replaces** the built-in default
+     list rather than adding to it. Admin-write.
 
 ## Testing
 

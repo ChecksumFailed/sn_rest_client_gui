@@ -34,3 +34,40 @@ Property({
         write: ['admin'],
     },
 })
+
+/**
+ * Gates request-body capture in the audit log (RestExplorerEngine.DEBUG_PROPERTY /
+ * _debugEnabled / the audit log's `request_body` column). Off by default -- request
+ * bodies routinely carry secrets (passwords, tokens embedded in a payload), so an admin
+ * has to explicitly opt in per-instance rather than have every call's body logged.
+ */
+Property({
+    $id: Now.ID['debug'],
+    name: 'x_1676196_rest_gui.debug',
+    type: 'boolean',
+    value: 'false',
+    description:
+        'When enabled, the Outbound REST Console audit log also captures the request body sent with each call. Off by default -- request bodies can contain secrets, so only enable for troubleshooting.',
+    roles: {
+        write: ['admin'],
+    },
+})
+
+/**
+ * Comma-separated, case-insensitive list of query parameter names whose values
+ * RestExplorerEngine._redactSensitiveQueryParams always redacts before a request URL is
+ * written to the audit log (endpoint column), regardless of auth type. Setting this
+ * REPLACES the built-in default list rather than adding to it -- copy the default value
+ * below into the new value first if you just want to add a name.
+ */
+Property({
+    $id: Now.ID['sensitive-query-params'],
+    name: 'x_1676196_rest_gui.sensitive_query_params',
+    type: 'string',
+    value: 'api_key,apikey,api-key,key,access_token,token,secret,client_secret,password,pwd,auth,authorization,sig,signature',
+    description:
+        'Comma-separated, case-insensitive query parameter names whose values are always redacted (replaced with REDACTED) before a request URL is written to the Outbound REST Console audit log. Setting this replaces the built-in default list rather than adding to it.',
+    roles: {
+        write: ['admin'],
+    },
+})

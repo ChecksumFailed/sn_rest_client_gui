@@ -14,9 +14,28 @@ RestExplorerEngine.prototype = {
     // the widget, so disabling it actually blocks the call rather than just the UI option.
     ENABLE_DIRECT_URL_PROPERTY: 'x_1676196_rest_gui.enable_direct_url',
 
-    // Audit trail of every execute() call -- see src/fluent/table/audit-log.now.ts for why
-    // bodies/headers/query strings are deliberately excluded.
+    // Gates request-body capture in the audit log (see _logRequest / request_body column).
+    // Off by default -- request bodies routinely carry secrets the audit log must not
+    // become a second place those leak from, so an admin has to opt in per-instance.
+    DEBUG_PROPERTY: 'x_1676196_rest_gui.debug',
+
+    // Audit trail of every execute() call -- see src/fluent/table/audit-log.now.ts. Stores
+    // the full request URL (query string included) with known-sensitive query parameter
+    // values redacted; never stores headers, and only stores the request body when
+    // DEBUG_PROPERTY is on.
     AUDIT_LOG_TABLE: 'x_1676196_rest_gui_audit_log',
+
+    // Property holding a comma-separated list of query parameter names (case-insensitive)
+    // whose values are always redacted before a URL is written to the audit log, regardless
+    // of auth type. Lets an admin extend/trim the denylist per-instance without a code
+    // change. See DEFAULT_SENSITIVE_QUERY_PARAMS for the value when unset -- the property
+    // REPLACES that default rather than adding to it.
+    SENSITIVE_QUERY_PARAMS_PROPERTY: 'x_1676196_rest_gui.sensitive_query_params',
+
+    // Default for SENSITIVE_QUERY_PARAMS_PROPERTY -- covers the common names a hand-built
+    // or third-party REST Message endpoint uses for an inline credential. Keep in sync with
+    // the Property's `value` in src/fluent/security/properties.now.ts.
+    DEFAULT_SENSITIVE_QUERY_PARAMS: 'api_key,apikey,api-key,key,access_token,token,secret,client_secret,password,pwd,auth,authorization,sig,signature',
 
     // Seconds of remaining token life below which we force a refresh instead of
     // reusing the cached token.
@@ -519,6 +538,12 @@ RestExplorerEngine.prototype = {
         return gs.getProperty(this.ENABLE_DIRECT_URL_PROPERTY, 'true') === 'true';
     },
 
+    /** Whether request bodies are captured in the audit log. Defaults to disabled --
+     *  an admin opts IN, since bodies can carry secrets the log must not leak. */
+    _debugEnabled: function() {
+        return gs.getProperty(this.DEBUG_PROPERTY, 'false') === 'true';
+    },
+
     /**
      * Write one audit row per execute() call -- fire-and-forget: a logging failure
      * (table missing, ACL denies the insert) must never sink an otherwise-good response.
@@ -530,31 +555,84 @@ RestExplorerEngine.prototype = {
                 return; // Table not present on this instance -- fail soft.
             }
             var useUrl = config.source === 'url';
+            var loggedUrl = this._redactSensitiveQueryParams(
+                (result && result.url) || config.endpoint || '',
+                this._extraSensitiveParamNames(config)
+            );
             gr.initialize();
             gr.setValue('source', useUrl ? 'url' : 'restMessage');
             gr.setValue('rest_message', useUrl ? '' : (config.restMessage || ''));
             gr.setValue('function_name', useUrl ? '' : (config.method || ''));
             gr.setValue('http_method', String(config.httpMethod || '').toLowerCase());
-            gr.setValue('endpoint', this._sanitizeEndpointForLog((result && result.url) || config.endpoint || ''));
+            gr.setValue('endpoint', loggedUrl.substring(0, 4000));
             gr.setValue('mid_server', config.midServer || '');
             gr.setValue('auth_type', config.authType || 'none');
+            // Only the profile matching auth_type is ever set -- never both, and neither
+            // for manual-entry Basic (no profile involved), API key, or no auth.
+            gr.setValue('oauth_profile', config.authType === 'oauth' ? (config.authProfile || '') : '');
+            gr.setValue('basic_auth_profile', config.authType === 'basic' && (!config.basic || config.basic.mode !== 'manual')
+                ? (config.authProfile || '')
+                : '');
             gr.setValue('status_code', result && result.status != null ? result.status : '');
             gr.setValue('ok', !!(result && result.ok));
             gr.setValue('error', result && result.error ? String(result.error).substring(0, 4000) : '');
             gr.setValue('duration_ms', durationMs);
+            // Request body is opt-in via DEBUG_PROPERTY -- see its declaration for why.
+            gr.setValue('request_body', this._debugEnabled() && config.body != null
+                ? String(config.body).substring(0, 4000)
+                : '');
             gr.insert();
         } catch (e) {
             gs.warn('RestExplorerEngine: failed to write audit log entry: ' + e);
         }
     },
 
-    /** Strip the query string before logging -- query params can carry secrets (an API
-     *  key placed in the query, or a resolved ${token}), and the audit log must not
-     *  become a second place credentials leak from. */
-    _sanitizeEndpointForLog: function(url) {
+    /** Query parameter names to redact beyond the SENSITIVE_QUERY_PARAMS_PROPERTY list,
+     *  derived from this specific call -- e.g. a custom-named API key placed in the query
+     *  string that wouldn't otherwise match the configured denylist. */
+    _extraSensitiveParamNames: function(config) {
+        var key = config.apiKey;
+        if (config.authType === 'apikey' && key && key.placement === 'query' && key.name) {
+            return [String(key.name)];
+        }
+        return [];
+    },
+
+    /** The configured denylist (SENSITIVE_QUERY_PARAMS_PROPERTY), lowercased and trimmed.
+     *  Falls back to DEFAULT_SENSITIVE_QUERY_PARAMS when the property is unset -- an admin
+     *  setting the property REPLACES the default list rather than adding to it. */
+    _sensitiveQueryParamNames: function() {
+        var csv = gs.getProperty(this.SENSITIVE_QUERY_PARAMS_PROPERTY, this.DEFAULT_SENSITIVE_QUERY_PARAMS);
+        return String(csv).split(',').map(function(n) {
+            return n.trim().toLowerCase();
+        }).filter(function(n) {
+            return !!n;
+        });
+    },
+
+    /** Redact the values of known-sensitive query parameters before a URL is logged.
+     *  Everything else about the URL (host, path, other query params) is kept intact so
+     *  the audit log reflects what was actually sent. */
+    _redactSensitiveQueryParams: function(url, extraNames) {
         if (!url) { return ''; }
-        var q = String(url).indexOf('?');
-        return q === -1 ? String(url) : String(url).substring(0, q);
+        var str = String(url);
+        var q = str.indexOf('?');
+        if (q === -1) { return str; }
+        var base = str.substring(0, q);
+        var qs = str.substring(q + 1);
+        if (!qs) { return str; }
+        var deny = {};
+        this._sensitiveQueryParamNames().forEach(function(n) { deny[n] = true; });
+        (extraNames || []).forEach(function(n) { if (n) { deny[String(n).toLowerCase()] = true; } });
+        var parts = qs.split('&').map(function(pair) {
+            if (!pair) { return pair; }
+            var eq = pair.indexOf('=');
+            var rawName = eq === -1 ? pair : pair.substring(0, eq);
+            var name;
+            try { name = decodeURIComponent(rawName); } catch (e) { name = rawName; }
+            return deny[name.toLowerCase()] ? rawName + '=REDACTED' : pair;
+        });
+        return base + '?' + parts.join('&');
     },
 
     /** Build the final request URL from the endpoint plus every setQueryParameter call
