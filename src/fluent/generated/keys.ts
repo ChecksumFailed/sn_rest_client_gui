@@ -354,6 +354,7 @@ declare global {
                     {
                         table: 'sys_ui_element'
                         id: '0208054093120b10e4bb7ee32bba1063'
+                        deleted: true
                         key: {
                             sys_ui_section: {
                                 id: 'c208054093120b10e4bb7ee32bba100b'
@@ -423,6 +424,7 @@ declare global {
                     {
                         table: 'sys_ui_element'
                         id: '0608054093120b10e4bb7ee32bba1061'
+                        deleted: true
                         key: {
                             sys_ui_section: {
                                 id: 'c208054093120b10e4bb7ee32bba100b'
@@ -440,6 +442,7 @@ declare global {
                     {
                         table: 'sys_ui_element'
                         id: '0608054093120b10e4bb7ee32bba1068'
+                        deleted: true
                         key: {
                             sys_ui_section: {
                                 id: 'c208054093120b10e4bb7ee32bba100b'
@@ -465,6 +468,7 @@ declare global {
                     {
                         table: 'sys_ui_element'
                         id: '0a08054093120b10e4bb7ee32bba105f'
+                        deleted: true
                         key: {
                             sys_ui_section: {
                                 id: 'c208054093120b10e4bb7ee32bba100b'
@@ -482,6 +486,7 @@ declare global {
                     {
                         table: 'sys_ui_element'
                         id: '0a08054093120b10e4bb7ee32bba1066'
+                        deleted: true
                         key: {
                             sys_ui_section: {
                                 id: 'c208054093120b10e4bb7ee32bba100b'
@@ -508,6 +513,7 @@ declare global {
                     {
                         table: 'sys_ui_element'
                         id: '0e08054093120b10e4bb7ee32bba105d'
+                        deleted: true
                         key: {
                             sys_ui_section: {
                                 id: 'c208054093120b10e4bb7ee32bba100b'
@@ -525,6 +531,7 @@ declare global {
                     {
                         table: 'sys_ui_element'
                         id: '0e08054093120b10e4bb7ee32bba1064'
+                        deleted: true
                         key: {
                             sys_ui_section: {
                                 id: 'c208054093120b10e4bb7ee32bba100b'
@@ -722,6 +729,7 @@ declare global {
                     {
                         table: 'sys_ui_element'
                         id: '4208054093120b10e4bb7ee32bba1091'
+                        deleted: true
                         key: {
                             sys_ui_section: {
                                 id: 'c208054093120b10e4bb7ee32bba100b'
@@ -739,6 +747,7 @@ declare global {
                     {
                         table: 'sys_ui_element'
                         id: '4608054093120b10e4bb7ee32bba108f'
+                        deleted: true
                         key: {
                             sys_ui_section: {
                                 id: 'c208054093120b10e4bb7ee32bba100b'
@@ -801,6 +810,7 @@ declare global {
                     {
                         table: 'sys_ui_element'
                         id: '4e08054093120b10e4bb7ee32bba1010'
+                        deleted: true
                         key: {
                             sys_ui_section: {
                                 id: 'c208054093120b10e4bb7ee32bba100b'
@@ -1177,6 +1187,7 @@ declare global {
                     {
                         table: 'sys_ui_element'
                         id: '8208054093120b10e4bb7ee32bba1062'
+                        deleted: true
                         key: {
                             sys_ui_section: {
                                 id: 'c208054093120b10e4bb7ee32bba100b'
@@ -1210,6 +1221,7 @@ declare global {
                     {
                         table: 'sys_ui_element'
                         id: '8608054093120b10e4bb7ee32bba1060'
+                        deleted: true
                         key: {
                             sys_ui_section: {
                                 id: 'c208054093120b10e4bb7ee32bba100b'
@@ -1227,6 +1239,7 @@ declare global {
                     {
                         table: 'sys_ui_element'
                         id: '8608054093120b10e4bb7ee32bba1067'
+                        deleted: true
                         key: {
                             sys_ui_section: {
                                 id: 'c208054093120b10e4bb7ee32bba100b'
@@ -1244,6 +1257,7 @@ declare global {
                     {
                         table: 'sys_ui_element'
                         id: '8a08054093120b10e4bb7ee32bba105e'
+                        deleted: true
                         key: {
                             sys_ui_section: {
                                 id: 'c208054093120b10e4bb7ee32bba100b'
@@ -1261,6 +1275,7 @@ declare global {
                     {
                         table: 'sys_ui_element'
                         id: '8a08054093120b10e4bb7ee32bba1065'
+                        deleted: true
                         key: {
                             sys_ui_section: {
                                 id: 'c208054093120b10e4bb7ee32bba100b'
@@ -1287,6 +1302,7 @@ declare global {
                     {
                         table: 'sys_ui_element'
                         id: '8e08054093120b10e4bb7ee32bba105c'
+                        deleted: true
                         key: {
                             sys_ui_section: {
                                 id: 'c208054093120b10e4bb7ee32bba100b'
@@ -1304,6 +1320,7 @@ declare global {
                     {
                         table: 'sys_ui_element'
                         id: '8e08054093120b10e4bb7ee32bba1063'
+                        deleted: true
                         key: {
                             sys_ui_section: {
                                 id: 'c208054093120b10e4bb7ee32bba100b'
@@ -1602,6 +1619,7 @@ declare global {
                     {
                         table: 'sys_ui_section'
                         id: 'c208054093120b10e4bb7ee32bba100b'
+                        deleted: true
                         key: {
                             name: 'x_1676196_rest_gui_audit_log'
                             caption: 'NULL'
@@ -1617,6 +1635,7 @@ declare global {
                     {
                         table: 'sys_ui_element'
                         id: 'c208054093120b10e4bb7ee32bba1090'
+                        deleted: true
                         key: {
                             sys_ui_section: {
                                 id: 'c208054093120b10e4bb7ee32bba100b'
@@ -1634,6 +1653,7 @@ declare global {
                     {
                         table: 'sys_ui_element'
                         id: 'c608054093120b10e4bb7ee32bba108e'
+                        deleted: true
                         key: {
                             sys_ui_section: {
                                 id: 'c208054093120b10e4bb7ee32bba100b'
@@ -1708,6 +1728,7 @@ declare global {
                     {
                         table: 'sys_ui_element'
                         id: 'ce08054093120b10e4bb7ee32bba1091'
+                        deleted: true
                         key: {
                             sys_ui_section: {
                                 id: 'c208054093120b10e4bb7ee32bba100b'
