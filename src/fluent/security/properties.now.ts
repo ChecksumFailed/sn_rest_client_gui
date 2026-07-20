@@ -11,7 +11,8 @@ Property({
     name: 'x_1676196_rest_gui.default_mid_server',
     type: 'string',
     value: '',
-    description: 'Fallback MID server name for Outbound REST Console when none is selected and none can be auto-detected.',
+    description:
+        'Fallback MID server name for Outbound REST Console when none is selected and none can be auto-detected.',
 })
 
 /**
@@ -26,8 +27,9 @@ Property({
     $id: Now.ID['enable-direct-url'],
     name: 'x_1676196_rest_gui.enable_direct_url',
     type: 'boolean',
-    value: 'true',
-    description: 'Enables Direct URL mode in the Outbound REST Console (calling an arbitrary URL instead of a saved REST Message). Disable to restrict the console to vetted REST Message records only.',
+    value: 'false',
+    description:
+        'Enables Direct URL mode in the Outbound REST Console (calling an arbitrary URL instead of a saved REST Message). Disable to restrict the console to vetted REST Message records only.',
     roles: {
         write: ['admin'],
     },

@@ -24,8 +24,14 @@ export const x_1676196_rest_gui_audit_log = Table({
             label: 'Source',
             mandatory: true,
             choices: {
-                restMessage: 'REST Message',
-                url: 'Direct URL',
+                restMessage: {
+                    label: 'REST Message',
+                    sequence: 1,
+                },
+                url: {
+                    label: 'Direct URL',
+                    sequence: 2,
+                },
             },
         }),
         rest_message: ReferenceColumn({
@@ -44,4 +50,11 @@ export const x_1676196_rest_gui_audit_log = Table({
         error: StringColumn({ label: 'Error', maxLength: 4000 }),
         duration_ms: IntegerColumn({ label: 'Duration (ms)' }),
     },
+    index: [
+        {
+            name: 'index',
+            unique: false,
+            element: 'rest_message',
+        },
+    ],
 })

@@ -264,6 +264,23 @@ declare global {
                         }
                     },
                     {
+                        table: 'sys_ui_element'
+                        id: '0208054093120b10e4bb7ee32bba1063'
+                        key: {
+                            sys_ui_section: {
+                                id: 'c208054093120b10e4bb7ee32bba100b'
+                                key: {
+                                    name: 'x_1676196_rest_gui_audit_log'
+                                    caption: 'NULL'
+                                    view: 'Default view'
+                                    sys_domain: 'global'
+                                }
+                            }
+                            element: 'auth_type'
+                            position: '8'
+                        }
+                    },
+                    {
                         table: 'sys_dictionary'
                         id: '03ae1f0d0dec41d59adfe1059c892f6d'
                         key: {
@@ -272,11 +289,79 @@ declare global {
                         }
                     },
                     {
+                        table: 'sys_ui_element'
+                        id: '0608054093120b10e4bb7ee32bba1061'
+                        key: {
+                            sys_ui_section: {
+                                id: 'c208054093120b10e4bb7ee32bba100b'
+                                key: {
+                                    name: 'x_1676196_rest_gui_audit_log'
+                                    caption: 'NULL'
+                                    view: 'Default view'
+                                    sys_domain: 'global'
+                                }
+                            }
+                            element: '.begin_split'
+                            position: '6'
+                        }
+                    },
+                    {
+                        table: 'sys_ui_element'
+                        id: '0608054093120b10e4bb7ee32bba1068'
+                        key: {
+                            sys_ui_section: {
+                                id: 'c208054093120b10e4bb7ee32bba100b'
+                                key: {
+                                    name: 'x_1676196_rest_gui_audit_log'
+                                    caption: 'NULL'
+                                    view: 'Default view'
+                                    sys_domain: 'global'
+                                }
+                            }
+                            element: 'mid_server'
+                            position: '14'
+                        }
+                    },
+                    {
                         table: 'sys_dictionary'
                         id: '07b2d9eddb2640f8a5df152290cfec38'
                         key: {
                             name: 'x_1676196_rest_gui_audit_log'
                             element: 'mid_server'
+                        }
+                    },
+                    {
+                        table: 'sys_ui_element'
+                        id: '0a08054093120b10e4bb7ee32bba105f'
+                        key: {
+                            sys_ui_section: {
+                                id: 'c208054093120b10e4bb7ee32bba100b'
+                                key: {
+                                    name: 'x_1676196_rest_gui_audit_log'
+                                    caption: 'NULL'
+                                    view: 'Default view'
+                                    sys_domain: 'global'
+                                }
+                            }
+                            element: '.end_split'
+                            position: '4'
+                        }
+                    },
+                    {
+                        table: 'sys_ui_element'
+                        id: '0a08054093120b10e4bb7ee32bba1066'
+                        key: {
+                            sys_ui_section: {
+                                id: 'c208054093120b10e4bb7ee32bba100b'
+                                key: {
+                                    name: 'x_1676196_rest_gui_audit_log'
+                                    caption: 'NULL'
+                                    view: 'Default view'
+                                    sys_domain: 'global'
+                                }
+                            }
+                            element: 'function_name'
+                            position: '12'
                         }
                     },
                     {
@@ -289,10 +374,95 @@ declare global {
                         }
                     },
                     {
+                        table: 'sys_ui_element'
+                        id: '0e08054093120b10e4bb7ee32bba105d'
+                        key: {
+                            sys_ui_section: {
+                                id: 'c208054093120b10e4bb7ee32bba100b'
+                                key: {
+                                    name: 'x_1676196_rest_gui_audit_log'
+                                    caption: 'NULL'
+                                    view: 'Default view'
+                                    sys_domain: 'global'
+                                }
+                            }
+                            element: '.split'
+                            position: '2'
+                        }
+                    },
+                    {
+                        table: 'sys_ui_element'
+                        id: '0e08054093120b10e4bb7ee32bba1064'
+                        key: {
+                            sys_ui_section: {
+                                id: 'c208054093120b10e4bb7ee32bba100b'
+                                key: {
+                                    name: 'x_1676196_rest_gui_audit_log'
+                                    caption: 'NULL'
+                                    view: 'Default view'
+                                    sys_domain: 'global'
+                                }
+                            }
+                            element: 'http_method'
+                            position: '10'
+                        }
+                    },
+                    {
+                        table: 'sys_ui_element'
+                        id: '4208054093120b10e4bb7ee32bba1091'
+                        key: {
+                            sys_ui_section: {
+                                id: 'c208054093120b10e4bb7ee32bba100b'
+                                key: {
+                                    name: 'x_1676196_rest_gui_audit_log'
+                                    caption: 'NULL'
+                                    view: 'Default view'
+                                    sys_domain: 'global'
+                                }
+                            }
+                            element: 'ok'
+                            position: '18'
+                        }
+                    },
+                    {
+                        table: 'sys_ui_element'
+                        id: '4608054093120b10e4bb7ee32bba108f'
+                        key: {
+                            sys_ui_section: {
+                                id: 'c208054093120b10e4bb7ee32bba100b'
+                                key: {
+                                    name: 'x_1676196_rest_gui_audit_log'
+                                    caption: 'NULL'
+                                    view: 'Default view'
+                                    sys_domain: 'global'
+                                }
+                            }
+                            element: 'rest_message'
+                            position: '16'
+                        }
+                    },
+                    {
                         table: 'sp_page'
                         id: '4dd5edca16d94cc98a704422f499a05b'
                         key: {
                             id: 'rest_explorer'
+                        }
+                    },
+                    {
+                        table: 'sys_ui_element'
+                        id: '4e08054093120b10e4bb7ee32bba1010'
+                        key: {
+                            sys_ui_section: {
+                                id: 'c208054093120b10e4bb7ee32bba100b'
+                                key: {
+                                    name: 'x_1676196_rest_gui_audit_log'
+                                    caption: 'NULL'
+                                    view: 'Default view'
+                                    sys_domain: 'global'
+                                }
+                            }
+                            element: '.begin_split'
+                            position: '0'
                         }
                     },
                     {
@@ -328,11 +498,83 @@ declare global {
                         }
                     },
                     {
+                        table: 'sys_ui_list_element'
+                        id: '62284d4093120b10e4bb7ee32bba1031'
+                        key: {
+                            list_id: {
+                                id: 'de284d4093120b10e4bb7ee32bba102a'
+                                key: {
+                                    name: 'x_1676196_rest_gui_audit_log'
+                                    view: 'Default view'
+                                    sys_domain: 'global'
+                                    element: 'NULL'
+                                    relationship: 'NULL'
+                                    parent: 'NULL'
+                                }
+                            }
+                            element: 'function_name'
+                        }
+                    },
+                    {
+                        table: 'sys_ui_list_element'
+                        id: '66284d4093120b10e4bb7ee32bba1030'
+                        key: {
+                            list_id: {
+                                id: 'de284d4093120b10e4bb7ee32bba102a'
+                                key: {
+                                    name: 'x_1676196_rest_gui_audit_log'
+                                    view: 'Default view'
+                                    sys_domain: 'global'
+                                    element: 'NULL'
+                                    relationship: 'NULL'
+                                    parent: 'NULL'
+                                }
+                            }
+                            element: 'endpoint'
+                        }
+                    },
+                    {
+                        table: 'sys_ui_list_element'
+                        id: '6a284d4093120b10e4bb7ee32bba1032'
+                        key: {
+                            list_id: {
+                                id: 'de284d4093120b10e4bb7ee32bba102a'
+                                key: {
+                                    name: 'x_1676196_rest_gui_audit_log'
+                                    view: 'Default view'
+                                    sys_domain: 'global'
+                                    element: 'NULL'
+                                    relationship: 'NULL'
+                                    parent: 'NULL'
+                                }
+                            }
+                            element: 'rest_message'
+                        }
+                    },
+                    {
                         table: 'sys_choice_set'
                         id: '6c335053d0fe4180af66854a2f5771f5'
                         key: {
                             name: 'x_1676196_rest_gui_audit_log'
                             element: 'source'
+                        }
+                    },
+                    {
+                        table: 'sys_ui_list_element'
+                        id: '6e284d4093120b10e4bb7ee32bba1031'
+                        key: {
+                            list_id: {
+                                id: 'de284d4093120b10e4bb7ee32bba102a'
+                                key: {
+                                    name: 'x_1676196_rest_gui_audit_log'
+                                    view: 'Default view'
+                                    sys_domain: 'global'
+                                    element: 'NULL'
+                                    relationship: 'NULL'
+                                    parent: 'NULL'
+                                }
+                            }
+                            element: 'mid_server'
                         }
                     },
                     {
@@ -370,6 +612,23 @@ declare global {
                         }
                     },
                     {
+                        table: 'sys_ui_element'
+                        id: '8208054093120b10e4bb7ee32bba1062'
+                        key: {
+                            sys_ui_section: {
+                                id: 'c208054093120b10e4bb7ee32bba100b'
+                                key: {
+                                    name: 'x_1676196_rest_gui_audit_log'
+                                    caption: 'NULL'
+                                    view: 'Default view'
+                                    sys_domain: 'global'
+                                }
+                            }
+                            element: 'duration_ms'
+                            position: '7'
+                        }
+                    },
+                    {
                         table: 'sys_documentation'
                         id: '8359010599a348529baceac04ee4718c'
                         key: {
@@ -386,12 +645,114 @@ declare global {
                         }
                     },
                     {
+                        table: 'sys_ui_element'
+                        id: '8608054093120b10e4bb7ee32bba1060'
+                        key: {
+                            sys_ui_section: {
+                                id: 'c208054093120b10e4bb7ee32bba100b'
+                                key: {
+                                    name: 'x_1676196_rest_gui_audit_log'
+                                    caption: 'NULL'
+                                    view: 'Default view'
+                                    sys_domain: 'global'
+                                }
+                            }
+                            element: 'endpoint'
+                            position: '5'
+                        }
+                    },
+                    {
+                        table: 'sys_ui_element'
+                        id: '8608054093120b10e4bb7ee32bba1067'
+                        key: {
+                            sys_ui_section: {
+                                id: 'c208054093120b10e4bb7ee32bba100b'
+                                key: {
+                                    name: 'x_1676196_rest_gui_audit_log'
+                                    caption: 'NULL'
+                                    view: 'Default view'
+                                    sys_domain: 'global'
+                                }
+                            }
+                            element: 'error'
+                            position: '13'
+                        }
+                    },
+                    {
+                        table: 'sys_ui_element'
+                        id: '8a08054093120b10e4bb7ee32bba105e'
+                        key: {
+                            sys_ui_section: {
+                                id: 'c208054093120b10e4bb7ee32bba100b'
+                                key: {
+                                    name: 'x_1676196_rest_gui_audit_log'
+                                    caption: 'NULL'
+                                    view: 'Default view'
+                                    sys_domain: 'global'
+                                }
+                            }
+                            element: 'status_code'
+                            position: '3'
+                        }
+                    },
+                    {
+                        table: 'sys_ui_element'
+                        id: '8a08054093120b10e4bb7ee32bba1065'
+                        key: {
+                            sys_ui_section: {
+                                id: 'c208054093120b10e4bb7ee32bba100b'
+                                key: {
+                                    name: 'x_1676196_rest_gui_audit_log'
+                                    caption: 'NULL'
+                                    view: 'Default view'
+                                    sys_domain: 'global'
+                                }
+                            }
+                            element: '.end_split'
+                            position: '11'
+                        }
+                    },
+                    {
                         table: 'sys_documentation'
                         id: '8ba75adadbb1488cbe774392bce53c88'
                         key: {
                             name: 'x_1676196_rest_gui_audit_log'
                             element: 'mid_server'
                             language: 'en'
+                        }
+                    },
+                    {
+                        table: 'sys_ui_element'
+                        id: '8e08054093120b10e4bb7ee32bba105c'
+                        key: {
+                            sys_ui_section: {
+                                id: 'c208054093120b10e4bb7ee32bba100b'
+                                key: {
+                                    name: 'x_1676196_rest_gui_audit_log'
+                                    caption: 'NULL'
+                                    view: 'Default view'
+                                    sys_domain: 'global'
+                                }
+                            }
+                            element: 'source'
+                            position: '1'
+                        }
+                    },
+                    {
+                        table: 'sys_ui_element'
+                        id: '8e08054093120b10e4bb7ee32bba1063'
+                        key: {
+                            sys_ui_section: {
+                                id: 'c208054093120b10e4bb7ee32bba100b'
+                                key: {
+                                    name: 'x_1676196_rest_gui_audit_log'
+                                    caption: 'NULL'
+                                    view: 'Default view'
+                                    sys_domain: 'global'
+                                }
+                            }
+                            element: '.split'
+                            position: '9'
                         }
                     },
                     {
@@ -437,12 +798,69 @@ declare global {
                         }
                     },
                     {
+                        table: 'sys_ui_section'
+                        id: 'c208054093120b10e4bb7ee32bba100b'
+                        key: {
+                            name: 'x_1676196_rest_gui_audit_log'
+                            caption: 'NULL'
+                            view: {
+                                id: 'Default view'
+                                key: {
+                                    name: 'NULL'
+                                }
+                            }
+                            sys_domain: 'global'
+                        }
+                    },
+                    {
+                        table: 'sys_ui_element'
+                        id: 'c208054093120b10e4bb7ee32bba1090'
+                        key: {
+                            sys_ui_section: {
+                                id: 'c208054093120b10e4bb7ee32bba100b'
+                                key: {
+                                    name: 'x_1676196_rest_gui_audit_log'
+                                    caption: 'NULL'
+                                    view: 'Default view'
+                                    sys_domain: 'global'
+                                }
+                            }
+                            element: '.split'
+                            position: '17'
+                        }
+                    },
+                    {
+                        table: 'sys_ui_element'
+                        id: 'c608054093120b10e4bb7ee32bba108e'
+                        key: {
+                            sys_ui_section: {
+                                id: 'c208054093120b10e4bb7ee32bba100b'
+                                key: {
+                                    name: 'x_1676196_rest_gui_audit_log'
+                                    caption: 'NULL'
+                                    view: 'Default view'
+                                    sys_domain: 'global'
+                                }
+                            }
+                            element: '.begin_split'
+                            position: '15'
+                        }
+                    },
+                    {
                         table: 'sys_documentation'
                         id: 'c62c72ed8b144e1aace1d5e3e0d56a05'
                         key: {
                             name: 'x_1676196_rest_gui_audit_log'
                             element: 'rest_message'
                             language: 'en'
+                        }
+                    },
+                    {
+                        table: 'sys_index'
+                        id: 'cb9decb4dc334ccc8d8630e949a2ff7d'
+                        key: {
+                            logical_table_name: 'x_1676196_rest_gui_audit_log'
+                            col_name_string: 'rest_message'
                         }
                     },
                     {
@@ -455,11 +873,45 @@ declare global {
                         }
                     },
                     {
+                        table: 'sys_ui_element'
+                        id: 'ce08054093120b10e4bb7ee32bba1091'
+                        key: {
+                            sys_ui_section: {
+                                id: 'c208054093120b10e4bb7ee32bba100b'
+                                key: {
+                                    name: 'x_1676196_rest_gui_audit_log'
+                                    caption: 'NULL'
+                                    view: 'Default view'
+                                    sys_domain: 'global'
+                                }
+                            }
+                            element: '.end_split'
+                            position: '19'
+                        }
+                    },
+                    {
                         table: 'sys_dictionary'
                         id: 'd1b8a6990fd341e3b97f9fd7478ac0a3'
                         key: {
                             name: 'x_1676196_rest_gui_audit_log'
                             element: 'source'
+                        }
+                    },
+                    {
+                        table: 'sys_ui_list'
+                        id: 'de284d4093120b10e4bb7ee32bba102a'
+                        key: {
+                            name: 'x_1676196_rest_gui_audit_log'
+                            view: {
+                                id: 'Default view'
+                                key: {
+                                    name: 'NULL'
+                                }
+                            }
+                            sys_domain: 'global'
+                            element: 'NULL'
+                            relationship: 'NULL'
+                            parent: 'NULL'
                         }
                     },
                     {
@@ -471,12 +923,120 @@ declare global {
                         }
                     },
                     {
+                        table: 'sys_ui_list_element'
+                        id: 'e2284d4093120b10e4bb7ee32bba1032'
+                        key: {
+                            list_id: {
+                                id: 'de284d4093120b10e4bb7ee32bba102a'
+                                key: {
+                                    name: 'x_1676196_rest_gui_audit_log'
+                                    view: 'Default view'
+                                    sys_domain: 'global'
+                                    element: 'NULL'
+                                    relationship: 'NULL'
+                                    parent: 'NULL'
+                                }
+                            }
+                            element: 'ok'
+                        }
+                    },
+                    {
+                        table: 'sys_ui_list_element'
+                        id: 'e6284d4093120b10e4bb7ee32bba1031'
+                        key: {
+                            list_id: {
+                                id: 'de284d4093120b10e4bb7ee32bba102a'
+                                key: {
+                                    name: 'x_1676196_rest_gui_audit_log'
+                                    view: 'Default view'
+                                    sys_domain: 'global'
+                                    element: 'NULL'
+                                    relationship: 'NULL'
+                                    parent: 'NULL'
+                                }
+                            }
+                            element: 'http_method'
+                        }
+                    },
+                    {
                         table: 'sys_documentation'
                         id: 'ea17787d2f3b4270b407b82e99a7e4d4'
                         key: {
                             name: 'x_1676196_rest_gui_audit_log'
                             element: 'NULL'
                             language: 'en'
+                        }
+                    },
+                    {
+                        table: 'sys_ui_list_element'
+                        id: 'ea284d4093120b10e4bb7ee32bba1030'
+                        key: {
+                            list_id: {
+                                id: 'de284d4093120b10e4bb7ee32bba102a'
+                                key: {
+                                    name: 'x_1676196_rest_gui_audit_log'
+                                    view: 'Default view'
+                                    sys_domain: 'global'
+                                    element: 'NULL'
+                                    relationship: 'NULL'
+                                    parent: 'NULL'
+                                }
+                            }
+                            element: 'error'
+                        }
+                    },
+                    {
+                        table: 'sys_ui_list_element'
+                        id: 'ee284d4093120b10e4bb7ee32bba102e'
+                        key: {
+                            list_id: {
+                                id: 'de284d4093120b10e4bb7ee32bba102a'
+                                key: {
+                                    name: 'x_1676196_rest_gui_audit_log'
+                                    view: 'Default view'
+                                    sys_domain: 'global'
+                                    element: 'NULL'
+                                    relationship: 'NULL'
+                                    parent: 'NULL'
+                                }
+                            }
+                            element: 'auth_type'
+                        }
+                    },
+                    {
+                        table: 'sys_ui_list_element'
+                        id: 'ee284d4093120b10e4bb7ee32bba102f'
+                        key: {
+                            list_id: {
+                                id: 'de284d4093120b10e4bb7ee32bba102a'
+                                key: {
+                                    name: 'x_1676196_rest_gui_audit_log'
+                                    view: 'Default view'
+                                    sys_domain: 'global'
+                                    element: 'NULL'
+                                    relationship: 'NULL'
+                                    parent: 'NULL'
+                                }
+                            }
+                            element: 'duration_ms'
+                        }
+                    },
+                    {
+                        table: 'sys_ui_list_element'
+                        id: 'ee284d4093120b10e4bb7ee32bba1032'
+                        key: {
+                            list_id: {
+                                id: 'de284d4093120b10e4bb7ee32bba102a'
+                                key: {
+                                    name: 'x_1676196_rest_gui_audit_log'
+                                    view: 'Default view'
+                                    sys_domain: 'global'
+                                    element: 'NULL'
+                                    relationship: 'NULL'
+                                    parent: 'NULL'
+                                }
+                            }
+                            element: 'source'
                         }
                     },
                     {
