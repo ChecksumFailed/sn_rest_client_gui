@@ -122,6 +122,7 @@ export const auditLogReadOwnOnly = Acl({
     adminOverrides: true,
     script: 'return current.getValue("sys_created_by") == gs.getUserName();',
     description: 'Explorer-role users may only read audit log rows they created. Admins see all rows.',
+    roles: ['x_1676196_rest_gui.user'],
 })
 
 /**
@@ -192,7 +193,13 @@ export const auditLogShowOauthProfile = UiPolicy({
     conditions: 'auth_type=oauth',
     reverseIfFalse: true,
     actions: [
-        { field: 'oauth_profile', visible: true, mandatory: 'ignore', readOnly: 'ignore' },
+        {
+            field: 'oauth_profile',
+            visible: true,
+            mandatory: 'ignore',
+            readOnly: 'ignore',
+            table: 'x_1676196_rest_gui_audit_log',
+        },
     ],
 })
 
@@ -204,6 +211,12 @@ export const auditLogShowBasicAuthProfile = UiPolicy({
     conditions: 'auth_type=basic',
     reverseIfFalse: true,
     actions: [
-        { field: 'basic_auth_profile', visible: true, mandatory: 'ignore', readOnly: 'ignore' },
+        {
+            field: 'basic_auth_profile',
+            visible: true,
+            mandatory: 'ignore',
+            readOnly: 'ignore',
+            table: 'x_1676196_rest_gui_audit_log',
+        },
     ],
 })

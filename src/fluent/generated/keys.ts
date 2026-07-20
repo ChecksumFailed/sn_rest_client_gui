@@ -111,6 +111,10 @@ declare global {
                         table: 'sp_row'
                         id: '9073dbf6847f448dae22aa128f0547e3'
                     }
+                    '9ce4adc093160b10e4bb7ee32bba10ca': {
+                        table: 'sys_security_acl'
+                        id: '9ce4adc093160b10e4bb7ee32bba10ca'
+                    }
                     '9f7b682b93c6c310e4bb7ee32bba109e': {
                         table: 'sys_scope_privilege'
                         id: '9f7b682b93c6c310e4bb7ee32bba109e'
@@ -118,6 +122,10 @@ declare global {
                     a1c7010093120b10e4bb7ee32bba10f7: {
                         table: 'sys_scope_privilege'
                         id: 'a1c7010093120b10e4bb7ee32bba10f7'
+                    }
+                    a4c1e90c93d20b10e4bb7ee32bba104b: {
+                        table: 'sys_security_acl'
+                        id: 'a4c1e90c93d20b10e4bb7ee32bba104b'
                     }
                     'audit-log-auto-flush': {
                         table: 'sys_auto_flush'
@@ -177,6 +185,10 @@ declare global {
                         table: 'sys_scope_privilege'
                         id: 'c6dc665393868310e4bb7ee32bba106b'
                     }
+                    c8952d4493160b10e4bb7ee32bba1093: {
+                        table: 'sys_security_acl'
+                        id: 'c8952d4493160b10e4bb7ee32bba1093'
+                    }
                     c8f5910093920b10e4bb7ee32bba102e: {
                         table: 'sys_dm_policy'
                         id: 'c8f5910093920b10e4bb7ee32bba102e'
@@ -192,6 +204,10 @@ declare global {
                     cfd1b6df93868310e4bb7ee32bba10a1: {
                         table: 'sys_scope_privilege'
                         id: 'cfd1b6df93868310e4bb7ee32bba10a1'
+                    }
+                    d426a1c493160b10e4bb7ee32bba1021: {
+                        table: 'sys_security_acl'
+                        id: 'd426a1c493160b10e4bb7ee32bba1021'
                     }
                     d42f361f930a8310e4bb7ee32bba10e1: {
                         table: 'sys_alias'
@@ -1402,6 +1418,19 @@ declare global {
                         }
                     },
                     {
+                        table: 'sys_security_acl_role'
+                        id: '95e4210493160b10e4bb7ee32bba1019'
+                        key: {
+                            sys_security_acl: '9ce4adc093160b10e4bb7ee32bba10ca'
+                            sys_user_role: {
+                                id: '2831a114c611228501d4ea6c309d626d'
+                                key: {
+                                    name: 'admin'
+                                }
+                            }
+                        }
+                    },
+                    {
                         table: 'sys_choice'
                         id: '9734ce0c163047a39c7cd09ac257431d'
                         key: {
@@ -1687,6 +1716,19 @@ declare global {
                         }
                     },
                     {
+                        table: 'sys_security_acl_role'
+                        id: 'cac1218493d20b10e4bb7ee32bba1059'
+                        key: {
+                            sys_security_acl: 'a4c1e90c93d20b10e4bb7ee32bba104b'
+                            sys_user_role: {
+                                id: 'fd6b51f50120496f895485cb9016083a'
+                                key: {
+                                    name: 'x_1676196_rest_gui.user'
+                                }
+                            }
+                        }
+                    },
+                    {
                         table: 'sys_index'
                         id: 'cb9decb4dc334ccc8d8630e949a2ff7d'
                         key: {
@@ -1826,6 +1868,19 @@ declare global {
                         key: {
                             name: 'x_1676196_rest_gui_audit_log'
                             element: 'source'
+                        }
+                    },
+                    {
+                        table: 'sys_security_acl_role'
+                        id: 'd1e1a14c93d20b10e4bb7ee32bba10af'
+                        key: {
+                            sys_security_acl: 'de2c1fc703934e2995f02e51e06c0cc5'
+                            sys_user_role: {
+                                id: 'fd6b51f50120496f895485cb9016083a'
+                                key: {
+                                    name: 'x_1676196_rest_gui.user'
+                                }
+                            }
                         }
                     },
                     {
